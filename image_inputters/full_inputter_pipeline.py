@@ -102,14 +102,14 @@ def read_sample(sample):
 
 # if __name__ == '__main__':
     # Read all samples using multi-cpu
-# pool_obj = multiprocess.Pool()
+pool_obj = multiprocess.Pool()
 # # multiprocess.Value("config", config) # added
-# ans = pool_obj.map(read_sample, config.index)
-# pool_obj.close()
+ans = pool_obj.map(read_sample, config.index)
+pool_obj.close()
 
 # Using for loop here
 # one of the pathe may not exist, check against kacpers code
-ans = [read_sample(sample_index) for sample_index in config.index]
+# ans = [read_sample(sample_index) for sample_index in config.index]
 
 # Create 'samples' and 'total' objects
 samples = []
