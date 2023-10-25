@@ -14,6 +14,7 @@ import csv
 os.environ["OPENCV_IO_MAX_IMAGE_PIXELS"] = "2500000000000000000"
 import cv2
 import multiprocess
+from math import ceil
 
 import pickle
 
@@ -33,13 +34,13 @@ def read_sample(sample, local_config):
     import cv2
 
     # Read the full-res tissue image as np.ndarray in two formats
-    fu_tissue_image_color = cv2.imread(local_config.loc[sample,"fullres_path"], cv2.IMREAD_COLOR)
-    fu_tissue_image_gray = cv2.cvtColor(fu_tissue_image_color, cv2.COLOR_BGR2GRAY)
+    # fu_tissue_image_color = cv2.imread(local_config.loc[sample,"fullres_path"], cv2.IMREAD_COLOR)
+    # fu_tissue_image_gray = cv2.cvtColor(fu_tissue_image_color, cv2.COLOR_BGR2GRAY)
 
     # Get scaling factor for transition of cords from full-res to hi-res and spot diamater
     scale_file = pd.read_json(os.path.join(local_config.loc[sample,"spaceranger_path"], "outs", "spatial", "scalefactors_json.json"), typ='series')
-    spot_diameter = scale_file[0]
-    scale_factor = scale_file[1]
+    spot_diameter = scale_file.iloc[0]
+    scale_factor = scale_file.iloc[1]
 
     # Get the high-res tissue image as np.ndarray in two formats
     hi_tissue_image_color = cv2.imread(os.path.join(local_config.loc[sample,"spaceranger_path"], "outs", "spatial", "tissue_hires_image.png"), cv2.IMREAD_COLOR)
@@ -69,6 +70,7 @@ def read_sample(sample, local_config):
 
     # Read true expert annotations
     true_labels = []
+    print(local_config.loc[sample,"true_annotation_path"])
     with open(local_config.loc[sample,"true_annotation_path"], newline="") as file: 
         for row in csv.reader(file):
             true_labels.append({
@@ -87,8 +89,8 @@ def read_sample(sample, local_config):
     # Combine all sample information
     sample_data = {"sample_id": local_config.loc[sample,"sample_id"],
                     "patient_id": local_config.loc[sample,"patient"],
-                    "fu_tissue_image_gray": fu_tissue_image_gray,
-                    "fu_tissue_image_color": fu_tissue_image_color,
+                    # "fu_tissue_image_gray": fu_tissue_image_gray,
+                    # "fu_tissue_image_color": fu_tissue_image_color,
                     "hi_tissue_image_gray": hi_tissue_image_gray,
                     "hi_tissue_image_color": hi_tissue_image_color,
                     "spot_diameter_fures": float(spot_diameter),
@@ -100,68 +102,88 @@ def read_sample(sample, local_config):
     return sample_data, spot_positions
 
 # %% Continuing above into main function
-if __name__ == '__main__':
+
+
+# if __name__ == '__main__':
     # Note that must be run with the above '__main__' check on Windows for multiprocessing
 
-    # Read all samples using multi-cpu
-    pool_obj = multiprocess.Pool()
-    # multiprocess.Value("local_config", config) # added
-    # ans = pool_obj.map(read_sample, config.index)
-    reader_args = [[x, config] for x in config.index]
-    ans = pool_obj.starmap(read_sample, reader_args)
-    pool_obj.close()
+reader_args = [[x, config] for x in config.index]
+# Initialize starmpa args
+# ans = []
 
-    # Using for loop here
-    # one of the pathe may not exist, check against kacpers code
-    # ans = [read_sample(sample_index) for sample_index in config.index]
+# NUM_POOLS = 6
+# group_size =  ceil(len(reader_args) / NUM_POOLS)
+# print(f"Samples in {NUM_POOLS} groups")
+# print("Starting sample making...")
+# for i in range(0,NUM_POOLS):
+#     print(f"Starting batch {i}")
 
-    # Create 'samples' and 'total' objects
-    samples = []
-    total = {"spots": pd.DataFrame(), "expression": pd.DataFrame(), "patches": []}
-    for sample_data, spot_positions in ans:
-        samples.append(sample_data)
-        total["spots"] = pd.concat([total["spots"], spot_positions])
+#     small_ans = []
+#     upper = min(i*group_size + group_size, len(reader_args))
+#     small_reader_args = reader_args[i*group_size:upper]
 
-    # Convert 'samples' into a dataframe
-        samples_df = pd.DataFrame(samples)
+#     pool_obj = multiprocess.Pool()
+#     # Read all samples using multi-cpu
+#     # multiprocess.Value("local_config", config) # added
+#     # ans = pool_obj.map(read_sample, config.index)
+#     small_ans = pool_obj.starmap(read_sample, small_reader_args)
+#     pool_obj.close()
+#     ans = ans + small_ans
+#     print(f"Done with batch {i}")
 
-    # Print recommended patch size based on mean spot diameter rounded up
-    print(f"Mean spot diameter in full-res: {int(np.ceil(np.mean(samples_df['spot_diameter_fures'])))} (min: {int(np.ceil(min(samples_df['spot_diameter_fures'])))}, max: {int(np.ceil(max(samples_df['spot_diameter_fures'])))})")
+ans = [read_sample(samp_info[0], samp_info[1]) for samp_info in reader_args]
 
-    # %% From WSI/B_patcher_raw.py
-    ### Create patches/tiles of WSIs for every sample
-    
-    # Set the patch size
-    PATCH_SIZE = 380
-    PATCH_TYPE = "color"
-    
-    # Enforce combined list is empty
-    total["patches"] = []
-    
-    # Iterate over samples
-    for sample in samples:
-        sample["patches_collection"] = []
-    
-        # Iterate over spots
-        for col, row in zip(sample["spot_data"]["pxl_col_fures"], sample["spot_data"]["pxl_row_fures"]):
-            patch_col = int(col - PATCH_SIZE / 2)
-            patch_row = int(row - PATCH_SIZE / 2)
-            
-            # Exctract a patch for every spot
-            patch_image = cv2.cvtColor(sample[f"fu_tissue_image_{PATCH_TYPE}"][patch_col:patch_col+PATCH_SIZE, patch_row:patch_row+PATCH_SIZE], cv2.COLOR_BGR2RGB)
-    
-            # Make sure a patch to append exists
-            if patch_image.size:
-                sample["patches_collection"].append(patch_image)
-    
-        # Add sample patches to combined list
-        total["patches"].extend(sample["patches_collection"])
-    
-    pickle.dump(total, open(".\image_inputters\inputter_results\total.pickle", "wb"))
-    samples_df.to_csv(".\image_inputters\inputter_results\samples.csv")
-    
-    print(type(total))
-    print(len(samples_df))
+# Using for loop here
+# one of the pathe may not exist, check against kacpers code
+# ans = [read_sample(sample_index) for sample_index in config.index]
+
+# Create 'samples' and 'total' objects
+samples = []
+total = {"spots": pd.DataFrame(), "expression": pd.DataFrame(), "patches": []}
+for sample_data, spot_positions in ans:
+    samples.append(sample_data)
+    total["spots"] = pd.concat([total["spots"], spot_positions])
+
+# Convert 'samples' into a dataframe
+    samples_df = pd.DataFrame(samples)
+
+# Print recommended patch size based on mean spot diameter rounded up
+print(f"Mean spot diameter in full-res: {int(np.ceil(np.mean(samples_df['spot_diameter_fures'])))} (min: {int(np.ceil(min(samples_df['spot_diameter_fures'])))}, max: {int(np.ceil(max(samples_df['spot_diameter_fures'])))})")
+
+# %% From WSI/B_patcher_raw.py
+### Create patches/tiles of WSIs for every sample
+
+# Set the patch size
+PATCH_SIZE = 380
+PATCH_TYPE = "color"
+
+# Enforce combined list is empty
+total["patches"] = []
+
+# Iterate over samples
+for sample in samples:
+    sample["patches_collection"] = []
+
+    # Iterate over spots
+    for col, row in zip(sample["spot_data"]["pxl_col_fures"], sample["spot_data"]["pxl_row_fures"]):
+        patch_col = int(col - PATCH_SIZE / 2)
+        patch_row = int(row - PATCH_SIZE / 2)
+        
+        # Exctract a patch for every spot
+        patch_image = cv2.cvtColor(sample[f"fu_tissue_image_{PATCH_TYPE}"][patch_col:patch_col+PATCH_SIZE, patch_row:patch_row+PATCH_SIZE], cv2.COLOR_BGR2RGB)
+
+        # Make sure a patch to append exists
+        if patch_image.size:
+            sample["patches_collection"].append(patch_image)
+
+    # Add sample patches to combined list
+    total["patches"].extend(sample["patches_collection"])
+
+pickle.dump(total, open(".\image_inputters\inputter_results\total.pickle", "wb"))
+samples_df.to_csv(".\image_inputters\inputter_results\samples.csv")
+
+print(type(total))
+print(len(samples_df))
 # %% From C-exp_loader_norm.ipynb
 
 # The expression normalization is not run here, but will be tested in future
