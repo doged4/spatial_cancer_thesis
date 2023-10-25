@@ -33,7 +33,7 @@ config = pd.read_csv(CONFIG_FILE_PATH)
 def read_sample(sample, local_config):
     import cv2
 
-    # Read the full-res tissue image as np.ndarray in two formats
+    # Set 
     # fu_tissue_image_color = cv2.imread(local_config.loc[sample,"fullres_path"], cv2.IMREAD_COLOR)
     # fu_tissue_image_gray = cv2.cvtColor(fu_tissue_image_color, cv2.COLOR_BGR2GRAY)
 
@@ -102,7 +102,6 @@ def read_sample(sample, local_config):
     return sample_data, spot_positions
 
 # %% Continuing above into main function
-
 
 # if __name__ == '__main__':
     # Note that must be run with the above '__main__' check on Windows for multiprocessing
