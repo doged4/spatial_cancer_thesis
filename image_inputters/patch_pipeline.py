@@ -2,17 +2,19 @@
 # Note: this code is inspired by a pipeline created by Kacper Maciejewski
 #       see https://gitlab.com/daub-lab/image-analysis_spatial-transcriptomics_breast-cancer_summer23
 #       And the WSI-ST data handling README for details
+#       Previous pipeline kept all of the sample dictionaries in one list, and each dictionary contained the full, high, and patch image data (in color and gray)
 
-
-
-# sample
-#   |-- full res
-#   |-- hi res
-#   |-- df of meta data
-#   |-- df of scale factors
-#   |-- patches
-#        |-- SAMPLE_BARCODE_COORDS.jpg
-#        ...
+# Structure:
+# patched_data
+# |-- sample
+#     |-- full res
+#     |-- hi res
+#     |-- df of meta data
+#     |-- df of scale factors
+#     |-- patches
+#          |-- SAMPLE_BARCODE_COORDS.jpg
+#          ...
+#   ...
 
 
 # %% Libraries
@@ -36,7 +38,7 @@ config = pd.read_csv(CONFIG_FILE_PATH)
 def read_sample(sample):
     """
     Read in row from config data frame, return df of relevant meta data for patient
-    Args: sample, a row from the config file; dictionary with patient, sample_id, spaceranger_path, fullres_path, true_annotation_path attributes
+    Args: sample, a row from the config DataFrame; dictionary with patient, sample_id, spaceranger_path, fullres_path, true_annotation_path attributes
     """
     # Get image paths in original dataq
     full_res_path = sample["fullres_path"] # Reference
@@ -99,7 +101,7 @@ def read_sample(sample):
     return sample_data, spot_positions
 
 
-def get_patches (fu_res_path, spot_positions, out_prefix):
+def get_patches (fu_res_path, spot_positions, out_prefix, colorspace = "color"):
     """
     Take full resolution images and slice into patches of PATCH_SIZE.
     Args:   fu_res_path, path to the full resolution image; string
@@ -107,7 +109,13 @@ def get_patches (fu_res_path, spot_positions, out_prefix):
             out_prefix, path to output all patches to; string
             *PATCH_SIZE, a constant set to specify height and width; int
     """
-    full_image = cv2.imread(fu_res_path)
+    if colorspace == "color":
+        full_image = cv2.imread(fu_res_path)
+    elif colorspace == "gray":
+        temp_image = cv2.imread(fu_res_path)
+        full_image = cv2.cvtColor(temp_image, cv2.COLOR_BGR2GRAY)
+    else:
+        raise(f"Cannot parse {colorspace}")
 
     for spot_ind in spot_positions.index:
         spot = spot_positions.loc[spot_ind]
@@ -126,9 +134,11 @@ def get_patches (fu_res_path, spot_positions, out_prefix):
         cv2.imwrite(os.path.join(out_prefix, patch_name), patch)
 
 
-
-# %%
 def construct_sample_dir(sample, out_dir):
+    """
+    Collect sample info, create output dir, and populate with patches.
+    Args: sample, a row from the config DataFrame; dictionary with patient, sample_id, spaceranger_path, fullres_path, true_annotation_path attributes
+    """
     sample_folder = os.path.join(out_dir,sample["sample_id"])
     os.mkdir(sample_folder)
     print(sample["sample_id"])
