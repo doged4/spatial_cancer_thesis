@@ -18,7 +18,6 @@
 # %% Libraries
 ### Load images and spot-assosiated data
 import os
-import numpy as np
 import pandas as pd
 import csv
 os.environ["OPENCV_IO_MAX_IMAGE_PIXELS"] = "2500000000000000000"
@@ -28,8 +27,8 @@ import pickle
 
 os.chdir("/Users/cbainton/Desktop/ST_project")
 
+PATCH_SIZE = 380
 CONFIG_FILE_PATH = ".\image_inputters\main_config_altered.csv"
-
 
 config = pd.read_csv(CONFIG_FILE_PATH)
 
@@ -99,7 +98,6 @@ def read_sample(sample):
     
     return sample_data, spot_positions
 
-PATCH_SIZE = 380
 
 def get_patches (fu_res_path, spot_positions, out_prefix):
     """
