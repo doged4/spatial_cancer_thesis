@@ -1,5 +1,6 @@
 # Author: Cevi Bainton
-# Note: this code is an implementation of a pipeline created by Kacper Maciejewski
+# Note: This pipeline is DEPRECATED (and never worked) in favor of patch_pipeline.py
+#      This code is an implementation of a pipeline created by Kacper Maciejewski
 #       see https://gitlab.com/daub-lab/image-analysis_spatial-transcriptomics_breast-cancer_summer23
 #       And the WSI-ST data handling README for details
 
@@ -31,8 +32,6 @@ config = pd.read_csv(CONFIG_FILE_PATH)
 
 # Define reading-sample strategy
 def read_sample(sample, local_config):
-    import cv2
-
     # Set 
     # fu_tissue_image_color = cv2.imread(local_config.loc[sample,"fullres_path"], cv2.IMREAD_COLOR)
     # fu_tissue_image_gray = cv2.cvtColor(fu_tissue_image_color, cv2.COLOR_BGR2GRAY)
