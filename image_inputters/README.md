@@ -1,1 +1,1 @@
-The work here builds on work done by KAcper Maciejewski. Please see [here](https://gitlab.com/daub-lab/image-analysis_spatial-transcriptomics_breast-cancer_summer23/-/tree/main/WSI-ST_framework) for code and documentation. Full credit to Kacper.
+The work here builds on work done by Kacper Maciejewski. Please see [here](https://gitlab.com/daub-lab/image-analysis_spatial-transcriptomics_breast-cancer_summer23/-/tree/main/WSI-ST_framework) for code and documentation. Full credit to Kacper.
