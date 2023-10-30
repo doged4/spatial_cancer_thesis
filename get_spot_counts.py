@@ -18,11 +18,12 @@ CountMatrix = collections.namedtuple('CountMatrix', ['feature_ref', 'barcodes', 
  
 def get_matrix_from_h5(filename):
     """
-    Return matrix from path to hdf5 filename for a SpaceRanger counts file
+    Return CountMatrix from path to hdf5 filename for a SpaceRanger counts file
     """
     with tables.open_file(filename, 'r') as f:
         mat_group = f.get_node(f.root, 'matrix')
         barcodes = f.get_node(mat_group, 'barcodes').read()
+        
         data = getattr(mat_group, 'data').read()
         indices = getattr(mat_group, 'indices').read()
         indptr = getattr(mat_group, 'indptr').read()
