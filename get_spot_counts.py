@@ -9,7 +9,8 @@ import tables
 
 import os
 from pandas import DataFrame
- 
+
+
 #%% Space Ranger code
 # The below code was taken from 10X genomics SpaceRanger help page
 
@@ -45,15 +46,26 @@ def get_matrix_from_h5(filename):
         
         return CountMatrix(feature_ref, barcodes, matrix)
  
-filtered_h5 = r"\Users\cbainton\Desktop\ST_project\original_data\Spaceranger_analysis\V10F03-033_A\outs\filtered_feature_bc_matrix.h5"
-filtered_matrix_h5 = get_matrix_from_h5(filtered_h5)
+# %% Read paths
+
+IN_DIR = "original_data/Spaceranger_analysis"
+OUT_DIR = "processed_data/Spaceranger_uncompressed" 
+
+sample_list = os.listdir(IN_DIR)
+
 # %%
-for filtered_h5_path in sample_list:
-    this_countmatrix = get_matrix_from_h5(filtered_h5_path)
+for sample in sample_list:
+    h5_path = os.path.join(IN_DIR, sample, "outs", "filtered_feature_bc_matrix.h5")
+    this_countmatrix = get_matrix_from_h5(h5_path)
     feature_ref = DataFrame(this_countmatrix.feature_ref)
     barcodes = DataFrame(this_countmatrix.barcodes)
     
-    feature_ref.to_csv(os.path.join(prefix, "features.tsv.gz"), sep="\t", compression="gzip")
-    barcodes.to_csv(os.path.join(prefix, "barcodes.tsv.gz"), sep="\t", compression="gzip")
+    out_folder = os.path.join(OUT_DIR, sample)
+    if not os.path.exists(out_folder):
+        os.mkdir(out_folder)
 
-    sio.mmwrite(os.path.join(prefix, "matrix.mtx"), this_countmatrix.matrix) # write sparse matrix
+    feature_ref.to_csv(os.path.join(out_folder, "features.tsv.gz"), sep="\t", compression="gzip")
+    barcodes.to_csv(os.path.join(out_folder, "barcodes.tsv.gz"), sep="\t", compression="gzip")
+    sio.mmwrite(os.path.join(out_folder, "matrix.mtx"), this_countmatrix.matrix) # write sparse matrix
+
+# %%
