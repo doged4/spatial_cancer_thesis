@@ -10,7 +10,7 @@ mtx_path = "processed_data/Spaceranger_uncompressed/V10F03-033_A/"
 mtx = sc.read_10x_mtx(mtx_path, 'gene_ids')
 
 # %% Testing with prebuilt visium
-visium_data = sc.read_visium("original_data/Spaceranger_analysis/V10F03-033_A/outs/")
+visium_data = sc.read_visium("original_data/Spaceranger_analysis/V10F03-033_C/outs/")
 # %%
 # From here https://scanpy-tutorials.readthedocs.io/en/latest/spatial/basic-analysis.html
 
@@ -18,6 +18,17 @@ visium_data = sc.read_visium("original_data/Spaceranger_analysis/V10F03-033_A/ou
 visium_data.var["mt"] = visium_data.var_names.str.startswith("MT-")
 sc.pp.calculate_qc_metrics(visium_data, qc_vars = ["mt"], inplace=True) # Where is the output?
 sc.pl.spatial(visium_data, img_key="hires", color=["total_counts", "n_genes_by_counts"]) # Whoa!
+
+# %%
+sc.pp.normalize_total(visium_data, inplace=True)
+sc.pp.log1p(visium_data)
+sc.pp.highly_variable_genes(visium_data, flavor="seurat", n_top_genes=2000)
+
+
+sc.pp.pca(visium_data)
+sc.pp.neighbors(visium_data)
+sc.tl.umap(visium_data)
+sc.tl.leiden(visium_data, key_added="clusters")  #clusters in the umap?
 
 # %% 
 # Next steps
