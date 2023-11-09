@@ -1,6 +1,6 @@
-import scanpy as sc
 
 # %% Test with h5
+import scanpy as sc
 
 this_path = "original_data/Spaceranger_analysis/V10F03-033_A/outs/filtered_feature_bc_matrix.h5"
 hd5 = sc.read_10x_h5(this_path)
@@ -35,3 +35,16 @@ sc.tl.leiden(visium_data, key_added="clusters")  #clusters in the umap?
 sc.pl.spatial(visium_data, img_key="hires", color="clusters", size=1.5)
 
 # %%
+
+type(visium_data.raw)
+
+
+# %%
+# Look here next! : https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html
+# img.generate_spot_crops looks crazy!!
+
+
+# We want: how to best get data from AnnData --> tensor
+# Later steps:
+#       image matrices --> tensor
+# or get things in anndata
