@@ -29,8 +29,9 @@ import pickle
 
 os.chdir("/Users/cbainton/Desktop/ST_project")
 
-PATCH_SIZE = 380
+PATCH_SIZE = 480
 CONFIG_FILE_PATH = ".\image_inputters\main_config_altered.csv"
+OUTPUT_PATH = "patched_data_480"
 
 config = pd.read_csv(CONFIG_FILE_PATH)
 
@@ -155,5 +156,5 @@ def construct_sample_dir(sample, out_dir):
 
 # %% Main loop over all samples
 for sample_ind in config.index:
-    construct_sample_dir(config.loc[sample_ind], "patched_data")
+    construct_sample_dir(config.loc[sample_ind], OUTPUT_PATH)
 # %%
