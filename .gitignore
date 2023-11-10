@@ -3,3 +3,5 @@ patched_data
 cleaned_classification
 patched_data_480
 tf_dataset
+old_im_features
+im_features
