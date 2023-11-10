@@ -60,12 +60,15 @@ print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT 
 
 ### Effnet v2l as paper recommended
 # %% Load in data
-IMAGE_SIZE = (480, 480, 3)
+# IMAGE_SIZE = (480, 480, 3)
+IMAGE_SIZE = (380, 380, 3)
 
 # Load in data from jpg files to make TF Dataset objects
-PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data_480"
+# PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data_480"
+PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data"
 OUT_DIR = "im_features"
-OUT_DATASET = "tf_dataset\processed_st"
+# OUT_DATASET = "tf_dataset\processed_st_480"
+OUT_DATASET = "tf_dataset\processed_st_380"
 
 
 
@@ -74,28 +77,37 @@ OUT_DATASET = "tf_dataset\processed_st"
 samples = os.listdir(PATCHED_PATH)
 
 def save_dataset(sample):
+    """Saves image patches in sample as a TensorFlow Dataset as shards
+    Args: sample, name of sample to read in; string
+    Output: returns nothing, constructs folder sample in OUT_DATASET and populates"""
+    # Setup input and output paths
     sample_dir = os.path.join(PATCHED_PATH, sample, "patches")
     image_paths = os.listdir(sample_dir)
     data_out = os.path.join(OUT_DATASET, sample)
     print(f"Sample: {sample}")
 
+    # Create sample output folder if needed
     if not os.path.exists(data_out):
         os.mkdir(data_out)
 
-    # Read in images
+    # Read in images to 4 way tensor (num patches, image height, image width, 3 colors)
     images = np.ndarray((len(image_paths),) + IMAGE_SIZE)
     for i in range(len(image_paths)):
         image_path = image_paths[i]
         image_arr = cv2.imread(os.path.join(sample_dir, image_path))
         images[i] = image_arr
 
+    # Get names without .jpg suffix
     dataset_names = tf.constant([name[:-4] for name in image_paths])
+    # Construct tf Dataset from tensor, each image with spot names
     dataset = tf.data.Dataset.from_tensor_slices((images, dataset_names))
+    # Save to shard format
     dataset.save(data_out)
+    
     print(f"Successfully output to {data_out}")
 
 
-def get_features(sample):
+def get_features(sample, from_dataset = True):
     print(sample)
     print(f'peak {tf.config.experimental.get_memory_info("GPU:0")["peak"]/1000000} mb')
     print(f'current {tf.config.experimental.get_memory_info("GPU:0")["current"]/1000000} mb')
@@ -106,17 +118,19 @@ def get_features(sample):
 
     if not os.path.exists(sample_out):
         os.mkdir(sample_out)
+    
+    # if not from_dataset:
+    #     # Read in images
+    #     images = np.ndarray((len(image_paths),) + IMAGE_SIZE)
+    #     for i in range(len(image_paths)):
+    #         image_path = image_paths[i]
+    #         image_arr = cv2.imread(os.path.join(sample_dir, image_path))
+    #         images[i] = image_arr
 
-    # Read in images
-    images = np.ndarray((len(image_paths),) + IMAGE_SIZE)
-    for i in range(len(image_paths)):
-        image_path = image_paths[i]
-        image_arr = cv2.imread(os.path.join(sample_dir, image_path))
-        images[i] = image_arr
+    tf.data.Dataset.load() # MAKE LOAD DATASETS
 
     test =tf.data.Dataset.from_tensor_slices(images)
-    # plt.imshow(images[0].astype(int))
-    # plt.show()
+
 
     # Run predictions
     image_outputs = effnet.predict(images)
@@ -132,6 +146,15 @@ def get_features(sample):
     out_dict =  os.path.join(sample_out, "image_features_dict.pickle")
     pickle.dump(image_out_dict, open(out_dict, "wb"))
 
+
+# %% Convert all samples to tf Dataset format and output in OUTPUT_DATASET
+# save_dataset('V10J20-085_D')
+done_samples = os.listdir(OUT_DATASET)
+these_samples = filter(lambda x: not x in done_samples, samples)
+for t_sample in these_samples:
+    save_dataset(t_sample)
+
+
 # # %% Set up model
 # effnet = tf.keras.applications.efficientnet_v2.EfficientNetV2L(
 #     include_top=True,
@@ -143,7 +166,5 @@ def get_features(sample):
 #     classifier_activation='softmax',
 #     include_preprocessing=True
 # )
-# %%
-for t_sample in samples:
-    save_dataset(t_sample)
-# %%
+
+# %% Run samples to get features
