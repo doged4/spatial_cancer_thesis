@@ -119,14 +119,6 @@ def get_features(sample, from_dataset = True):
     if not os.path.exists(sample_out):
         os.mkdir(sample_out)
     
-    # if not from_dataset:
-    #     # Read in images
-    #     images = np.ndarray((len(image_paths),) + IMAGE_SIZE)
-    #     for i in range(len(image_paths)):
-    #         image_path = image_paths[i]
-    #         image_arr = cv2.imread(os.path.join(sample_dir, image_path))
-    #         images[i] = image_arr
-
     tf.data.Dataset.load() # MAKE LOAD DATASETS
 
     test =tf.data.Dataset.from_tensor_slices(images)
