@@ -5,3 +5,5 @@ patched_data_480
 tf_dataset
 old_im_features
 im_features
+cnn_feature_models
+tools/caffe-tensorflow-python3/
