@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
+import pandas as pd
 import cv2
 import pickle
 
@@ -18,22 +19,6 @@ import pickle
 
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT AVAILABLE")
 
-# sess = tf.Session()
-# run_metadata = tf.RunMetadata()
-# sess.run(c, options=tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE, output_partition_graphs=True), run_metadata=run_metadata)
-
-# with open("im_features/run2.txt", "w") as out:
-#   out.write(str(run_metadata))
-
-# ### Effnet_b4 below
-# # %% Load in efficientnet_b4, which is the right size: EASY TO CHANGW
-# model_handle = "https://tfhub.dev/tensorflow/efficientnet/b4/feature-vector/1"
-
-
-# # Test different image analysis models
-# # Just on patches
-# # Export with just image features
-# # %%
 
 # PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data"
 # image_path = os.path.join(PATCHED_PATH, R"V10F03-033_C\patches\V10F03-033_C_AAACAAGTATCTCCCA-1_50_102.jpg")
@@ -41,20 +26,11 @@ print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT 
 # images = np.expand_dims(image, axis = 0) # makes 3 way tensor to 4 way (makes into 1 element long list of images)
 
 # # %% 
-# # See architecture
-# # effnet.summary()
-# # %% See more info https://www.tensorflow.org/hub/tutorials/tf2_image_retraining
-# IMAGE_SIZE = (380, 380, 3) # image.shape
+# ### Effnet_b4 below
 
-# model = tf.keras.Sequential([
-#     tf.keras.layers.Input(shape = IMAGE_SIZE),
-#     hub.KerasLayer(model_handle)
-# ])
-# # Note the lack of a dropout layer or a dense layer
-# model.build((None,)+IMAGE_SIZE)
-# # %%
+# %%
 # image_predictions = model.predict(images)
-# # %%
+# %%
 
 
 
@@ -68,7 +44,7 @@ IMAGE_SIZE = (380, 380, 3)
 PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data"
 OUT_DIR = "im_features"
 # OUT_DATASET = "tf_dataset\processed_st_480"
-OUT_DATASET = "tf_dataset\processed_st_380"
+OUT_DATASET = "tf_dataset\processed_st_380_compressed"
 
 
 
@@ -102,7 +78,7 @@ def save_dataset(sample):
     # Construct tf Dataset from tensor, each image with spot names
     dataset = tf.data.Dataset.from_tensor_slices((images, dataset_names))
     # Save to shard format
-    dataset.save(data_out)
+    dataset.save(data_out, compression = 'GZIP')
     
     print(f"Successfully output to {data_out}")
 
@@ -139,12 +115,80 @@ def get_features(sample, from_dataset = True):
     pickle.dump(image_out_dict, open(out_dict, "wb"))
 
 
+
+# %% Alternate TF dataset pulling method
+
+def get_image(path, name):
+    image = tf.image.decode_jpeg(tf.io.read_file(path))
+    return image, name
+
+def pointer_dataset(sample):
+    # Setup input and output paths
+    sample_dir = os.path.join(PATCHED_PATH, sample, "patches")
+    image_paths = os.listdir(sample_dir)
+    data_out = os.path.join(OUT_DATASET, sample)
+    print(f"Sample: {sample}")
+    dataset_names = tf.constant([name[:-4] for name in image_paths])
+    # See here: https://stackoverflow.com/questions/44416764/loading-folders-of-images-in-tensorflow
+    image_path_tensor = tf.convert_to_tensor(image_paths)
+    dataset_names_tensor = tf.convert_to_tensor(dataset_names)
+    dataset = tf.data.Dataset.from_tensor_slices((image_path_tensor, dataset_names_tensor))
+    dataset.map(get_image, num_parallel_calls=8) # convert paths to image tensors
+    print(f"Retrieved {data_out}")
+
+    return dataset
+    # Save to shard format
+    # dataset.save(data_out, compression = 'GZIP')
+
+
+# test= pointer_dataset('V10J20-085_D')
+# print(test)
+
+# %% Keras image input approach
+# seems like best method below:
+sample = 'V10F03-033_A'
+sample_dir = os.path.join(PATCHED_PATH, sample, r'patches')
+
+
+# Seems to be 2566 images
+image_dataset = tf.keras.utils.image_dataset_from_directory(
+    sample_dir,
+    image_size = IMAGE_SIZE[0:2],
+    labels=None # keeps 
+) 
+
+# %% Convert to features
+#  Load in efficientnet_b4, which is the right size: EASY TO CHANGW
+model_handle = "https://tfhub.dev/tensorflow/efficientnet/b4/feature-vector/1"
+# See more info https://www.tensorflow.org/hub/tutorials/tf2_image_retraining
+IMAGE_SIZE = (380, 380, 3) # image.shape
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Input(shape = IMAGE_SIZE),
+    hub.KerasLayer(model_handle) # if doesn't work, clear cached folder where weights stored
+])
+# Note the lack of a dropout layer or a dense layer
+model.build((None,)+IMAGE_SIZE)
+
+image_predictions = model.predict(image_dataset, use_multiprocessing=True)
+
+feature_dict = {}
+filepaths = os.listdir(sample_dir)
+
+# %% Load image predictions into DF
+
+for i in range(len(filepaths)):
+    feature_dict[filepaths[i]] = image_predictions[i]
+pd.DataFrame()
+# feature_df = pd.DataFrame(feature_dict, columns=['m'+str(x) for x in range()])
+# TODO: make into df and save df 
+
 # %% Convert all samples to tf Dataset format and output in OUTPUT_DATASET
 # save_dataset('V10J20-085_D')
-done_samples = os.listdir(OUT_DATASET)
-these_samples = filter(lambda x: not x in done_samples, samples)
-for t_sample in these_samples:
-    save_dataset(t_sample)
+# done_samples = os.listdir(OUT_DATASET)
+# these_samples = filter(lambda x: not x in done_samples, samples)
+# for t_sample in these_samples:
+#     save_dataset(t_sample)
 
 
 # # %% Set up model
