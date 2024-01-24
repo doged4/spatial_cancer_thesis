@@ -39,6 +39,19 @@ sc.pl.spatial(visium_data, img_key="hires", color="clusters", size=1.5)
 type(visium_data.raw)
 
 
+# %% Image work
+
+visium_data = sc.read_visium("original_data/Spaceranger_analysis/V10F03-033_C/outs/") #,
+                            #  source_image_path="original_data/original_data/High-resolution_tissue_images/V10F03-033/201210_BC_V10F03-033_S8C-T_RJ.C1-Spot000001.jpg")
+
+# Below found with 
+# sc.pp.highly_variable_genes(visium_data, flavor="seurat", n_top_genes=10)
+# visium_data.var['highly_variable'][visium_data.var['highly_variable']]
+
+sc.pl.spatial(visium_data, img_key="hires", color = "LINC00632")
+#%% Get df from adata
+visium_data.to_df()
+
 # %%
 # Look here next! : https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html
 # img.generate_spot_crops looks crazy!!
