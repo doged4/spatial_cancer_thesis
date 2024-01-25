@@ -1,6 +1,8 @@
 
 # %% Test with h5
 import scanpy as sc
+import matplotlib.pyplot as plt
+
 
 this_path = "original_data/Spaceranger_analysis/V10F03-033_A/outs/filtered_feature_bc_matrix.h5"
 hd5 = sc.read_10x_h5(this_path)
@@ -44,6 +46,10 @@ type(visium_data.raw)
 visium_data = sc.read_visium("original_data/Spaceranger_analysis/V10F03-033_C/outs/") #,
                             #  source_image_path="original_data/original_data/High-resolution_tissue_images/V10F03-033/201210_BC_V10F03-033_S8C-T_RJ.C1-Spot000001.jpg")
 
+# needs the below if you want to subset by gene names
+visium_data.var_names_make_unique(join='-')
+visium_data[:,['TP53']]
+
 # Below found with 
 # sc.pp.highly_variable_genes(visium_data, flavor="seurat", n_top_genes=10)
 # visium_data.var['highly_variable'][visium_data.var['highly_variable']]
@@ -51,6 +57,16 @@ visium_data = sc.read_visium("original_data/Spaceranger_analysis/V10F03-033_C/ou
 sc.pl.spatial(visium_data, img_key="hires", color = "LINC00632")
 #%% Get df from adata
 visium_data.to_df()
+
+# What are the top genes?
+gene_sums = visium_data.to_df().sum(axis=0)
+plt.hist(gene_sums)
+print(f"{sum(gene_sums == 0)} have no counts across any barcodes")
+
+print(gene_sums.nlargest(n = 1000))
+
+# How many mitochondrial genes?
+gene_sums[gene_sums.index.str.contains(pat = '^MT', regex = True)].nlargest(n = 1000)
 
 # %%
 # Look here next! : https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html
