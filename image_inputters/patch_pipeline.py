@@ -30,7 +30,7 @@ import pickle
 os.chdir("/Users/cbainton/Desktop/ST_project")
 
 PATCH_SIZE = 480
-CONFIG_FILE_PATH = ".\image_inputters\main_config_altered.csv"
+CONFIG_FILE_PATH = ".\image_inputters\main_config.csv"
 OUTPUT_PATH = "patched_data_480"
 
 config = pd.read_csv(CONFIG_FILE_PATH)
