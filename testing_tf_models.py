@@ -20,7 +20,7 @@ import pickle
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT AVAILABLE")
 
 
-# PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data"
+# PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\intermediate_data\patched_data"
 # image_path = os.path.join(PATCHED_PATH, R"V10F03-033_C\patches\V10F03-033_C_AAACAAGTATCTCCCA-1_50_102.jpg")
 # image = cv2.imread(image_path)
 # images = np.expand_dims(image, axis = 0) # makes 3 way tensor to 4 way (makes into 1 element long list of images)
@@ -40,8 +40,8 @@ print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT 
 IMAGE_SIZE = (380, 380, 3)
 
 # Load in data from jpg files to make TF Dataset objects
-# PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data_480"
-PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\patched_data"
+# PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\intermediate_data\patched_data_480"
+PATCHED_PATH = R"C:\Users\cbainton\Desktop\ST_project\intermediate_data\patched_data"
 OUT_DIR = "im_features"
 # OUT_DATASET = "tf_dataset\processed_st_480"
 OUT_DATASET = "tf_dataset\processed_st_380_compressed"
