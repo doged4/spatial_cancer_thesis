@@ -19,7 +19,7 @@ main_config["readable_id"] = [x[3][:3] for x in
 # get patient ids
 main_config.loc[main_config['biopsy_sample_id'].isna(),'biopsy_sample_id'] = 'unknown-x-x'
 main_config['patient'] = [x[0] for x in main_config['biopsy_sample_id'].str.split(pat = "-")]
-main_config.set_index('readable_id')
+main_config.set_index('readable_id', drop=False, inplace=True)
 
 # Get adatas
 adatas = dict()
@@ -28,10 +28,11 @@ for row in main_config.iterrows():
     single_adata.var_names_make_unique(join = "_")
     # Keep track of attributes of each sample in the unstructured region
     single_adata.uns['slide_id'] = row[1]['slide_id']
-    single_adata.uns['biopsy_sample_id'] = row[1]['biopsy_sample_id']
+    single_adata.uns['biopsy_sample_id'] = row[1]['biopsy_sample_id'].replace('-','')
     single_adata.uns['biopsy_expected_classification'] = row[1]['expected_classification']
     single_adata.uns['biopsy_annotated_classification'] = row[1]['annotated_classification']
     single_adata.uns['patient'] = row[1]['patient']
+
     adatas[row[1]["readable_id"]] = single_adata
 
 
@@ -52,10 +53,11 @@ for key in adatas.keys():
     # Column to track patient and slide classification for fully concatenated anndata operations
     adatas[key].obs['patient'] = adatas[key].uns['patient']
     adatas[key].obs["slide_condition"] = adatas[key].uns['biopsy_annotated_classification']
+    adatas[key].obs['biopsy_sample_id'] = adatas[key].uns['biopsy_sample_id']
 
 # Merge adatas
 for key in adatas.keys():
-    adatas[key].obs.index = [x + f'_{key}' for x in
+    adatas[key].obs.index = [x + f'_{key}_{adatas[key].uns["biopsy_sample_id"]}' for x in
         adatas[key].obs.index]
 
 main_adata = ad.concat(adatas=adatas,
@@ -131,28 +133,28 @@ qc_output = sc.pp.calculate_qc_metrics(main_adata)[0]
 # Log1p is log(x+1) of values
 plt.figure()
 plt.hist(qc_output.loc[:,'log1p_n_genes_by_counts'], bins = 100)
-plt.hist(qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
+plt.hist(qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p genes per count: blue is all, orange is just disease')
 
 plt.figure()
 plt.hist(qc_output.loc[:,'log1p_total_counts'], bins = 100)
-plt.hist(qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
+plt.hist(qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 qc_output['total_counts'].quantile([0,0.25,0.5,0.75,1])
 
 # %% What to filter by?
-print(qc_output.filter(regex="[AB]$",axis=0)['total_counts'].quantile([0,0.25,0.5,0.75,1]))
-print(qc_output.filter(regex="[CD]$",axis=0)['total_counts'].quantile([0,0.25,0.5,0.75,1]))
+print(qc_output.filter(regex="C\d$",axis=0)['total_counts'].quantile([0,0.25,0.5,0.75,1]))
+print(qc_output.filter(regex="T\d$",axis=0)['total_counts'].quantile([0,0.25,0.5,0.75,1]))
 
 print(qc_output['total_counts'].quantile([0.1]))
 # %%[markdown] This seems good for counts
 # Bottom 10% looks like those with counts of 46 or so, which is very little.
 # We'll filter for this
 # %% 
-print(qc_output.filter(regex="[AB]$",axis=0)['n_genes_by_counts'].quantile([0,0.25,0.5,0.75,1]))
-print(qc_output.filter(regex="[CD]$",axis=0)['n_genes_by_counts'].quantile([0,0.25,0.5,0.75,1]))
+print(qc_output.filter(regex="C\d$",axis=0)['n_genes_by_counts'].quantile([0,0.25,0.5,0.75,1]))
+print(qc_output.filter(regex="T\d$",axis=0)['n_genes_by_counts'].quantile([0,0.25,0.5,0.75,1]))
 
 print(qc_output['n_genes_by_counts'].quantile([0.1]))
 
@@ -191,11 +193,11 @@ filtered_adata = filtered_adata[
 
 # Confirm annotations match expected slide condition
 # A and B are meant to be control
-control_certains = [x == "control" and y == "normal" for x,y in 
+control_certains = [x == "Normal" and y == "normal" for x,y in 
                  zip(filtered_adata.obs["slide_condition"],
                       filtered_adata.obs["classification"])]
 # C and D are both meant to be disease
-disease_certains = [x == "disease" and y in ["cancer", "dcis"] for x,y in
+disease_certains = [x == "Tumor" and y in ["cancer", "dcis"] for x,y in
                     zip(filtered_adata.obs["slide_condition"],
                         filtered_adata.obs["classification"])]
 id_certains = [x or y for x,y in zip(control_certains, disease_certains)]
@@ -208,13 +210,13 @@ qc_output = sc.pp.calculate_qc_metrics(filtered_adata)[0]
 # Log1p is log(x+1) of values
 plt.figure()
 plt.hist(qc_output.loc[:,'log1p_n_genes_by_counts'], bins = 100)
-plt.hist(qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
+plt.hist(qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p genes per count: blue is all, orange is just disease')
 
 plt.figure()
 plt.hist(qc_output.loc[:,'log1p_total_counts'], bins = 100)
-plt.hist(qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
+plt.hist(qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 qc_output['total_counts'].quantile([0,0.25,0.5,0.75,1])
@@ -371,13 +373,13 @@ new_qc_output = sc.pp.calculate_qc_metrics(filtered_adata)[0]
 
 plt.figure()
 plt.hist(new_qc_output.loc[:,'log1p_n_genes_by_counts'], bins = 100)
-plt.hist(new_qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
+plt.hist(new_qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p genes per count: blue is all, orange is just disease')
 
 plt.figure()
 plt.hist(new_qc_output.loc[:,'log1p_total_counts'], bins = 100)
-plt.hist(new_qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
+plt.hist(new_qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 
@@ -424,13 +426,13 @@ qc_output = sc.pp.calculate_qc_metrics(filtered_adata)[0]
 # Log1p is log(x+1) of values
 plt.figure()
 plt.hist(qc_output.loc[:,'log1p_n_genes_by_counts'], bins = 100)
-plt.hist(qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
+plt.hist(qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p genes per count: blue is all, orange is just disease')
 
 plt.figure()
 plt.hist(qc_output.loc[:,'log1p_total_counts'], bins = 100)
-plt.hist(qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
+plt.hist(qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 qc_output['total_counts'].quantile([0,0.25,0.5,0.75,1])
@@ -486,13 +488,13 @@ seurat_qc_output = sc.pp.calculate_qc_metrics(sfiltered_adata)[0]
 # Log1p is log(x+1) of values
 plt.figure()
 plt.hist(seurat_qc_output.loc[:,'log1p_n_genes_by_counts'], bins = 100)
-plt.hist(seurat_qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
+plt.hist(seurat_qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_n_genes_by_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p genes per count: blue is all, orange is just disease')
 
 plt.figure()
 plt.hist(seurat_qc_output.loc[:,'log1p_total_counts'], bins = 100)
-plt.hist(seurat_qc_output.filter(regex="[CD]$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
+plt.hist(seurat_qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'], bins = 100)
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 seurat_qc_output['total_counts'].quantile([0,0.25,0.5,0.75,1])
