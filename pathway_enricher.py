@@ -236,11 +236,16 @@ disease_adatas = dict()
 for row in main_config.iterrows():
     patient_id = row[1]["patient"]
     slide_id = row[1]["readable_id"]
+    # Exclude the slide with unkown patient id
+    if patient_id =='unknown':
+        continue
     # Decide target ID based on total slide classification
     if row[1]['annotated_classification'] == 'Normal':
         target_dict = control_adatas
     elif row[1]['annotated_classification'] == 'Tumor':
         target_dict = disease_adatas
+    else:
+        continue
     # Merge adata based on tec
     if patient_id in target_dict.keys():
         target_dict[patient_id] = ad.concat(adatas=[target_dict[patient_id], adatas[slide_id]],
@@ -264,6 +269,11 @@ print([(sample, control_adatas[sample].shape[0]) for sample in control_adatas])
 # Some spots were not annotated as being clearly cancer or clearly control even if they were in a slide that expected this.
 # We will remove spots that were not classified. We will also remove those that were classified as noncancerous in the slides that expected to find tumor. These spots are normal tissue adjacent to the tumor (NAT). To simplify our analysis so that the microenvironment of our controls is more constant, we shall remove these tissues.
 #%% See annotation fracs
+annotation_colors = {'cancer':"#F8776D",
+                     'dcis':'orange',
+                     'normal':'#5090FF',
+                     'unclassified':'#555555'
+                     }
 disease_class_stats = pd.concat(
     [disease_adatas[sample].obs.loc[:,['patient','classification']] 
      for sample in disease_adatas.keys()], axis=0
@@ -276,7 +286,8 @@ disease_class_stats['classification'] =  disease_class_stats['classification'].a
    pn.xlab("Patient") +
    pn.ylab("Spot count") + 
    pn.ggtitle("Classification in Disease Slides") +
-   pn.guides(fill = pn.guide_legend(title="Classification")))
+   pn.scale_fill_manual(annotation_colors) +
+   pn.guides(fill = pn.guide_legend(title="Classification")) )
 #%% [markdown]
 # We can see that patients 35, 70, and 71 will have to excluded from the analysis
 #%% See in control
@@ -292,6 +303,7 @@ control_class_stats['classification'] =  control_class_stats['classification'].a
    pn.xlab("Patient") +
    pn.ylab("Spot count") + 
    pn.ggtitle("Classification in Control Slides") +
+   pn.scale_fill_manual(annotation_colors) +
    pn.guides(fill = pn.guide_legend(title="Classification")))
 # %% Filter by annotation
 # Filter to most certain annotations control
@@ -387,6 +399,9 @@ plt.hist(new_qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 
+# %% Save for testing elsewhere
+adatas['33D'].write("./intermediate_data/33D_S8T2.h5ad")
+adatas['33B'].write("./intermediate_data/33B_S8C2.h5ad")
 
 # %% Run Satija (Seurat) filterer
 # Filter genes for at least a count
