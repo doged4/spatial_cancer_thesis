@@ -227,25 +227,29 @@ qc_output['total_counts'].quantile([0,0.25,0.5,0.75,1])
 # We can combine the slides from the same patient with the same disease state. This means we are _ignoring_ potential batch effects. These will hopefully be captured by 
 
 # %% Merging  replicates
-# Merge  replicate slides
-all_keys = adatas.keys()
-control_slides = zip(sorted(list(filter(lambda x: "A" in x, all_keys))),
-                     sorted(list(filter(lambda x: "B" in x, all_keys))))
+# Merge replicate slides
+# TODO: confirm below works
+
 control_adatas = dict()
-for x,y in control_slides:
-    target_key = x[:2]
-    control_adatas[target_key] = ad.concat(adatas=[adatas[x], adatas[y]],
-                                    merge="same", 
-                                    label="dataset")
-    
-disease_slides = zip(sorted(list(filter(lambda x: "C" in x, all_keys))),
-                     sorted(list(filter(lambda x: "D" in x, all_keys))))
 disease_adatas = dict()
-for x,y in disease_slides:
-    target_key = x[:2]
-    disease_adatas[target_key] = ad.concat(adatas=[adatas[x], adatas[y]],
-                                    merge="same", 
-                                    label="dataset")
+# Combine each adata with those of same patient and slide level classification
+for row in main_config.iterrows():
+    patient_id = row[1]["patient"]
+    slide_id = row[1]["readable_id"]
+    # Decide target ID based on total slide classification
+    if row[1]['annotated_classification'] == 'Normal':
+        target_dict = control_adatas
+    elif row[1]['annotated_classification'] == 'Tumor':
+        target_dict = disease_adatas
+    # Merge adata based on tec
+    if patient_id in target_dict.keys():
+        target_dict[patient_id] = ad.concat(adatas=[target_dict[patient_id], adatas[slide_id]],
+                                merge="same", 
+                                label="dataset")
+    else:
+        target_dict[patient_id] = adatas[slide_id]
+
+
 #%%[markdown]
 # This brings together our technical replicates for each patient. We can see that they have differing total spots that pass filter
 #%%
