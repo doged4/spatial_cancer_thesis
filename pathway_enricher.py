@@ -5,46 +5,53 @@ import pandas as pd
 import matplotlib.pyplot as plt # just for histograms!
 import numpy as np
 import math
-# import plotnine as pn
+
+# from IPython.display import display, HTML
+import plotnine as pn
 
 
 # %% Load in all data
 # Get paths
-main_config_paths = pd.read_csv("./image_inputters/main_config.csv") 
+main_config = pd.read_csv("./image_inputters/main_config.csv") 
 # gets 33A for V10F03-033_A
-main_config_paths["readable_id"] = [x[3][:3] for x in 
-                                    main_config_paths.loc[:,"true_annotation_path"].str.split("/")]
+main_config["readable_id"] = [x[3][:3] for x in 
+                                    main_config.loc[:,"true_annotation_path"].str.split("/")]
+# get patient ids
+main_config.loc[main_config['biopsy_sample_id'].isna(),'biopsy_sample_id'] = 'unknown-x-x'
+main_config['patient'] = [x[0] for x in main_config['biopsy_sample_id'].str.split(pat = "-")]
+main_config.set_index('readable_id')
 
 # Get adatas
 adatas = dict()
-for row in main_config_paths.iterrows():
+for row in main_config.iterrows():
     single_adata = sc.read_visium(row[1]["spaceranger_path"] + "/outs/")
     single_adata.var_names_make_unique(join = "_")
+    # Keep track of attributes of each sample in the unstructured region
+    single_adata.uns['slide_id'] = row[1]['slide_id']
+    single_adata.uns['biopsy_sample_id'] = row[1]['biopsy_sample_id']
+    single_adata.uns['biopsy_expected_classification'] = row[1]['expected_classification']
+    single_adata.uns['biopsy_annotated_classification'] = row[1]['annotated_classification']
+    single_adata.uns['patient'] = row[1]['patient']
     adatas[row[1]["readable_id"]] = single_adata
 
 
-# Integrate annotations
+# Integrate annotations from pathologist
 paths_to_classification = "image_inputters/cleaned_classification"
 
 for key in adatas.keys():
-    classification_df = pd.read_csv(paths_to_classification + "/" + key + ".csv",
+    # Read in spot classifications from pathologist annotations (see : image_inputters\cevi_altering_loupebrowser_parser.ipynb)
+    spot_classifications = pd.read_csv(paths_to_classification + "/" + key + ".csv",
                                     names=  ["cluster", "classification", "int_class", "class_2"],
                                     index_col=0)
-    classification_df.loc[:, "classification"].astype(str, copy=False)
-
-    adatas[key].obs = adatas[key].obs.join(classification_df.loc[:,"classification"], how='left')
+    spot_classifications.loc[:, "classification"].astype(str, copy=False)
+    # Join spot info in image counts with classification
+    adatas[key].obs = adatas[key].obs.join(spot_classifications.loc[:,"classification"], how='left')
     # Note that spots that cannot be found in classification table will be given: NA
     # Spots that were not certainly assigned by a pathologist recieved: " "
-
-    adatas[key].obs["patient"] = key[:2] # just patient
-    slide_condition = ""
-    if key[2] in ["A", "B"]:
-        slide_condition = "control"
-    elif key[2] in ["C", "D"]:
-        slide_condition = "disease"
-    else:
-        raise RuntimeWarning("Slide designation broken")
-    adatas[key].obs["slide_condition"] = slide_condition
+    
+    # Column to track patient and slide classification for fully concatenated anndata operations
+    adatas[key].obs['patient'] = adatas[key].uns['patient']
+    adatas[key].obs["slide_condition"] = adatas[key].uns['biopsy_annotated_classification']
 
 # Merge adatas
 for key in adatas.keys():
@@ -54,7 +61,9 @@ for key in adatas.keys():
 main_adata = ad.concat(adatas=adatas,
                       merge="same", 
                       label="dataset")
-# new_adata.obs["dataset"] now tells us the dataset they each 
+# note uns data is lost here
+
+# new_adata.obs["dataset"] now tells us the slide id that they each 
 #   came from, or the end of the index
 # %% Save main adata
 # main_adata.write("./intermediate_data/all_expression.h5ad")
@@ -212,10 +221,11 @@ qc_output['total_counts'].quantile([0,0.25,0.5,0.75,1])
 
 
 # %%[markdown]
-# We will now filter by the number of counts alone.
+# ## Merging Replicates
+# We can combine the slides from the same patient with the same disease state. This means we are _ignoring_ potential batch effects. These will hopefully be captured by 
 
-# %% Filtering in dictionaries
-# Uses seurat below
+# %% Merging  replicates
+# Merge  replicate slides
 all_keys = adatas.keys()
 control_slides = zip(sorted(list(filter(lambda x: "A" in x, all_keys))),
                      sorted(list(filter(lambda x: "B" in x, all_keys))))
@@ -234,7 +244,62 @@ for x,y in disease_slides:
     disease_adatas[target_key] = ad.concat(adatas=[adatas[x], adatas[y]],
                                     merge="same", 
                                     label="dataset")
-# Filtering
+#%%[markdown]
+# This brings together our technical replicates for each patient. We can see that they have differing total spots that pass filter
+#%%
+print("Disease spots")
+print([(sample, disease_adatas[sample].shape[0]) for sample in disease_adatas])
+print("Control spots")
+print([(sample, control_adatas[sample].shape[0]) for sample in control_adatas])
+# %%[markdown]
+# ## Filtering
+# We will be careful as we transition into filtering spots by the quality of their annotations and amount of captured genes.
+# ### Filtering by Annotation
+# Some spots were not annotated as being clearly cancer or clearly control even if they were in a slide that expected this.
+# We will remove spots that were not classified. We will also remove those that were classified as noncancerous in the slides that expected to find tumor. These spots are normal tissue adjacent to the tumor (NAT). To simplify our analysis so that the microenvironment of our controls is more constant, we shall remove these tissues.
+#%% See annotation fracs
+disease_class_stats = pd.concat(
+    [disease_adatas[sample].obs.loc[:,['patient','classification']] 
+     for sample in disease_adatas.keys()], axis=0
+)
+disease_class_stats['classification'] =  disease_class_stats['classification'].apply(
+        lambda x: x if x in ["normal", "cancer", "dcis"] else "unclassified")
+
+(pn.ggplot(disease_class_stats, pn.aes(x="factor(patient)", fill="factor(classification)")) +
+  pn.geom_bar() +
+   pn.xlab("Patient") +
+   pn.ylab("Spot count") + 
+   pn.ggtitle("Classification in Disease Slides") +
+   pn.guides(fill = pn.guide_legend(title="Classification")))
+#%% [markdown]
+# We can see that patients 35, 70, and 71 will have to excluded from the analysis
+#%% See in control
+control_class_stats = pd.concat(
+    [control_adatas[sample].obs.loc[:,['patient','classification']] 
+     for sample in control_adatas.keys()], axis=0
+)
+control_class_stats['classification'] =  control_class_stats['classification'].apply(
+        lambda x: x if x in ["normal", "cancer", "dcis"] else "unclassified")
+
+(pn.ggplot(control_class_stats, pn.aes(x="factor(patient)", fill="factor(classification)")) +
+  pn.geom_bar() +
+   pn.xlab("Patient") +
+   pn.ylab("Spot count") + 
+   pn.ggtitle("Classification in Control Slides") +
+   pn.guides(fill = pn.guide_legend(title="Classification")))
+# %% Filter by annotation
+# Filter to most certain annotations control
+for key in control_adatas.keys():
+    control_adatas[key] = control_adatas[key][
+        control_adatas[key].obs['classification'] == "normal", :
+    ]
+# Filter to most certain annotations disease
+for key in disease_adatas.keys():
+    disease_adatas[key] = disease_adatas[key][
+        disease_adatas[key].obs['classification'].isin(["cancer", "dcis"]), :
+    ]
+#%%[markdown]
+# %% Filter for cell quality and normalize
 def basic_filter_adata(adata):
     """Perform preliminary steps from Seurats filtering process. 
     See _recipes of Scanpy for details.
@@ -249,45 +314,47 @@ def basic_filter_adata(adata):
 
 # Filter to most certain annotations control
 for key in control_adatas.keys():
-    control_adatas[key] = control_adatas[key][
-        control_adatas[key].obs['classification'] == "normal", :
-    ]
     basic_filter_adata(control_adatas[key])
 
 # Filter to most certain annotations disease
 for key in disease_adatas.keys():
-    disease_adatas[key] = disease_adatas[key][
-        disease_adatas[key].obs['classification'].isin(["cancer", "dcis"]), :
-    ]
     basic_filter_adata(disease_adatas[key])
 
 
 #%%[markdown]
 # Our data are now in control-disease pair dictionaries. We can use log1p and do differential expression
-    
+
+#%% REMOVE UNUSABLE COMPARISONS
+# TODO: formalize removal of samples
+# Temporary code for the deletions as seen above
+del disease_adatas['35']
+del disease_adatas['70']
+del disease_adatas['71']
+
 #%%Differential expression between pairs
-# TODO: test the below, it seems to take a while
-        # specifically fails on 36
 for key in disease_adatas.keys():
     print(disease_adatas[key].shape)
 
+    # Get genes that passed Seurat params in both controls and disease
     disease_genes = disease_adatas[key].var.index
     control_genes = control_adatas[key].var.index
     shared_genes = disease_genes[
         [x in control_genes for x in disease_genes]]
-    
+    print(f"Set {key} shares {len(shared_genes)} genes")
+    # Select only shared genes
     disease_adatas[key] = disease_adatas[key][:, shared_genes]
     control_adatas[key] = control_adatas[key][:, shared_genes]
 
+    # Make array of log1p means for normalization
     control_means = control_adatas[key].to_df().mean(axis=0)
     control_means = control_means.map(math.log1p)
     control_means = np.array(control_means)
 
-    # Convert to log1p space
+    # Convert normalized data to log1p space
     sc.pp.log1p(disease_adatas[key])
+    print(f"Normalizing {key}")
     # Subtract log1p of means from log1p of our data, as a matrix
     rows_count = disease_adatas[key].shape[0]
-    print(f"Normalizing {key}")
     disease_adatas[key].X = disease_adatas[key].X - np.broadcast_to(control_means, (rows_count, len(control_means)))
 
 # %% [markdown]
