@@ -40,3 +40,10 @@
 38,? invasive ca,cancer,1
 39,? ca,cancer,1
 40,?ca,cancer,1
+41,benign breast, normal, 0
+42,tumor,cancer,1
+43,nan,no_annotation,-1
+44,out,unclear,-1
+45,stroma,normal,0
+46,fat,normal,0
+47,immune cells,normal,0
