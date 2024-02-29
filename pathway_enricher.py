@@ -37,7 +37,7 @@ for row in main_config.iterrows():
 
 
 # Integrate annotations from pathologist
-paths_to_classification = "image_inputters/cleaned_classification"
+paths_to_classification = "image_inputters/cleaned_classification_wenwen"
 
 for key in adatas.keys():
     # Read in spot classifications from pathologist annotations (see : image_inputters\cevi_altering_loupebrowser_parser.ipynb)
@@ -45,15 +45,29 @@ for key in adatas.keys():
                                     names=  ["cluster", "classification", "int_class", "class_2"],
                                     index_col=0)
     spot_classifications.loc[:, "classification"].astype(str, copy=False)
+
+    slide_obs = adatas[key].obs
+
     # Join spot info in image counts with classification
-    adatas[key].obs = adatas[key].obs.join(spot_classifications.loc[:,"classification"], how='left')
+    slide_obs = slide_obs.join(spot_classifications.loc[:,"classification"], how='left')
     # Note that spots that cannot be found in classification table will be given: NA
     # Spots that were not certainly assigned by a pathologist recieved: " "
+
+    # Add category `unkown`
+    # slide_obs['classification'] = slide_obs['classification'].cat.add_categories('unknown')
+
+    # Set observations not 'cancer' or 'normal' to be 'unknown'
+    slide_obs.loc[ 
+        ~slide_obs.loc[:,"classification"].isin(['cancer', 'normal']), 
+        "classification"] = 'unknown'
+    
     
     # Column to track patient and slide classification for fully concatenated anndata operations
-    adatas[key].obs['patient'] = adatas[key].uns['patient']
-    adatas[key].obs["slide_condition"] = adatas[key].uns['biopsy_annotated_classification']
-    adatas[key].obs['biopsy_sample_id'] = adatas[key].uns['biopsy_sample_id']
+    slide_obs['patient'] = adatas[key].uns['patient']
+    slide_obs["slide_condition"] = adatas[key].uns['biopsy_annotated_classification']
+    slide_obs['biopsy_sample_id'] = adatas[key].uns['biopsy_sample_id']
+    # Set back (may be unnecessary)
+    adatas[key].obs = slide_obs
 
 # Merge adatas
 for key in adatas.keys():
