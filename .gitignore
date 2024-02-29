@@ -1,6 +1,6 @@
 original_data
 intermediate_data/patched_data
-cleaned_classification
+cleaned_classification*
 intermediate_data/patched_data_480
 tf_dataset
 old_im_features
