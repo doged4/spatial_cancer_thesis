@@ -45,11 +45,25 @@ class image_extracter:
         if self.verbose:
             print("Model ready")
 
-    def extract(self, image):
+    def extract_one(self, image):
         """Return extracted image features using a prepped model"""
         if self.model == None:
             raise RuntimeWarning("Prep model before extracting an image")
-        return self.model(image)
+        # Get tensor to right shape to run and make tensor
+        im_tensor = tf.expand_dims(tf.constant(image), 0)
+
+        return self.model(im_tensor)
+        
+    # TODO: test below
+    def extract_many(self, images):
+        """Return extracted image features using a prepped model"""
+        if self.model == None:
+            raise RuntimeWarning("Prep model before extracting an image")
+        # Make images into tensor to run
+        im_tensor = tf.constant(images)
+
+        return self.model(im_tensor)
+    
 
     
 
