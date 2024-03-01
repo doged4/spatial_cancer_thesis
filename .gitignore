@@ -7,3 +7,4 @@ old_im_features
 im_features
 cnn_feature_models
 tools/caffe-tensorflow-python3/
+__pycache__
