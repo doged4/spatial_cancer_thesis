@@ -1,4 +1,4 @@
-# %%
+# %% Libraries
 import scanpy as sc
 import anndata as ad
 import pandas as pd
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 import gseapy
 
-# %%
+# %% Load in st data
 s8t2_adata = ad.read_h5ad("./intermediate_data/33D_S8T2.h5ad")
 s8c2_adata = ad.read_h5ad("./intermediate_data/33B_S8C2.h5ad")
 
@@ -22,7 +22,7 @@ s8c2_adata = ad.read_h5ad("./intermediate_data/33B_S8C2.h5ad")
 big_adata = ad.concat([s8c2_adata, s8t2_adata], merge='same', label='dataset')
 dataset_class = big_adata.obs['slide_condition'].to_list()
 
-# %%
+# %% Testing p vals first
 # Advised from GSEAPY read the docs gsea function
 gs_out = gseapy.GSEA(data=big_adata.to_df().transpose(),
                  gene_sets='MSigDB_Oncogenic_Signatures',
@@ -136,11 +136,17 @@ print(spot_ssgs_results[s8t2_adata.obs.index[1]] ==  all_at_once.loc[
 #%%[markdonw]
 # Let's try running them all through ssGSEA solo. We can then collect all of the enrichment into an adata at the end
 # %% Run all spots
+from time import process_time
+tstart = process_time()
+# print(tstart)
+spot_ssgs_results = {}
 for i, spot_id in enumerate(s8t2_adata.obs.index):
     spot_ssgs_results[spot_id] = gseapy.ssgsea(
         data=s8t2_adata[i].to_df().T,
         gene_sets='MSigDB_Oncogenic_Signatures',
         )
+elapsed = process_time()  - tstart
+print(f"{elapsed} elapsed seconds for one_by_one")
 # %%
 # Collects res2d from each ssgsea output in dictionary
 res_dict = {}
@@ -186,18 +192,21 @@ t_results_adata = ad.AnnData(
 )
 
 # Just for safekeeping!
-t_results_adata.write_h5ad("intermediate_data/s8t2_one_by_one_enrichments.h5ad")
+# t_results_adata.write_h5ad("intermediate_data/s8t2_one_by_one_enrichments.h5ad")
+t_results_adata = sc.read_h5ad("intermediate_data/s8t2_one_by_one_enrichments.h5ad")
+
 
 # %% [markdown]
 # Look at this plot! Scanpy works nicely for us. `SRC UP.V1 UP` looks nice for us
 # %% Plot pathway features spatially.
 # Works!
 sc.pl.spatial(t_results_adata, img_key="hires", color = "SRC UP.V1 UP")
-# %%
-# Return different dtypes hmm
-s8t2_adata[1,2].to_df().loc[:,'OR4F5']
-
-t_results_adata[1,2].to_df().loc[:,"RB P107 DN.V1 UP"]
+sc.pl.spatial(t_results_adata, img_key="hires", layer= 'normalized_per_spot', color = "SRC UP.V1 UP")
+# %% [markdown]
+# I looks like our normalized data is within a much more reasonable range.
+# Let's look at see what our most variable genes are
+# %% Most variable pathway signatures
+sc.pl.highly_variable_genes(t_results_adata)
 
 
 #%% [markdown]
@@ -205,9 +214,82 @@ t_results_adata[1,2].to_df().loc[:,"RB P107 DN.V1 UP"]
 # We will now try to run the GSEAPY ssGSEA on all of the samples at once rather than through a for loop, as this may improve performance.
 
 #%% Run all together
+from time import process_time
+tstart = process_time()
+# print(tstart)
 all_ssgs_results = gseapy.ssgsea(
         data=s8t2_adata.to_df().T,
         gene_sets='MSigDB_Oncogenic_Signatures',
         )
-#%% Convert to anndata
+elapsed = process_time() - tstart
+print(f"{elapsed} elapsed seconds for all_together")
 
+# %% Collect results and save as anndata
+enrichments = all_ssgs_results.res2d.pivot(columns='Term',index='Name')
+enrichments = enrichments.astype('float')
+
+all_ssgs_results_adata = ad.AnnData(
+    X = enrichments['ES'],
+    obs=s8t2_adata.obs,
+    var = pd.DataFrame(data = {'term' : list(enrichments['ES'].columns)},
+                        index = list(enrichments['ES'].columns)),
+    uns=s8t2_adata.uns,
+    obsm=s8t2_adata.obsm,
+    layers={'nes' : enrichments['NES']}
+)
+
+#%% Save anndata
+all_ssgs_results_adata.write_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
+# all_ssgs_results_adata = sc.read_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
+
+#%% [markdown]
+# Let's do some analysis of the gene sets that are most variable across the slide. 
+# %%
+sc.pp.highly_variable_genes(all_ssgs_results_adata, n_bins=20, layer='nes')
+sc.pl.highly_variable_genes(all_ssgs_results_adata)
+all_ssgs_results_adata.var.loc[all_ssgs_results_adata.var['highly_variable']]
+# %% [markdown]
+# We can see that many gene sets seem to appear.
+# Some appear both up and down, which makes sense. Theoretically, genes associated with increases in expression in the pathway and decreases will both be evident.
+# These include: 
+# * LTE2
+# * CAMP
+# * PDGF ERK DN
+# 
+# Notable others:
+# * ERB2 UP
+# 
+# Let's see what ERB2 expression looks like
+#%% ERB2 expression
+sc.pl.spatial(all_ssgs_results_adata,layer='nes', img_key="hires", color = ["ERB2 UP.V1 UP", "LTE2 UP.V1 UP"])
+sc.pl.spatial(all_ssgs_results_adata,layer='nes', img_key="hires", color = ["BCAT BILD ET AL UP"])
+	
+# %%[markdown]
+# We should confirm that this is not simply the regions in which gene counts appear.
+#%% 
+s8t2_adata.var["mt"] = s8t2_adata.var_names.str.startswith("MT-")
+sc.pp.calculate_qc_metrics(s8t2_adata, qc_vars = ["mt"], inplace=True) # Where is the output?
+sc.pl.spatial(s8t2_adata, img_key="hires", color=["total_counts", "n_genes_by_counts"]) # Whoa!
+
+#%% [markdown]
+# How does this compare to the classification?
+# %% Classifications
+sc.pl.spatial(all_ssgs_results_adata, color = 'classification')
+
+# Want to see all the data?
+# for key in adatas.keys():
+#    sc.pl.spatial(adatas[key], color="classification")
+
+#%% Run with permutes
+#%% Run all together
+from time import process_time
+tstart = process_time()
+# print(tstart)
+ssgs_results_with_p = gseapy.ssgsea(
+        data=s8t2_adata.to_df().T,
+        gene_sets='MSigDB_Oncogenic_Signatures',
+        permutation_num=1000
+        )
+
+elapsed = process_time() - tstart
+print(f"{elapsed} elapsed seconds for all_together")
