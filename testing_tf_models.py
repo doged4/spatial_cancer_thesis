@@ -204,3 +204,31 @@ pd.DataFrame()
 # )
 
 # %% Run samples to get features
+
+
+# %% Testing out tf model into a model pipeline
+
+#  Load in efficientnet_b4, which is the right size: EASY TO CHANGW
+model_handle = "https://tfhub.dev/tensorflow/efficientnet/b4/feature-vector/1"
+# See more info https://www.tensorflow.org/hub/tutorials/tf2_image_retraining
+IMAGE_SIZE = (380, 380, 3) # image.shape
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Input(shape = IMAGE_SIZE),
+    hub.KerasLayer(model_handle) # if doesn't work, clear cached folder where weights stored
+])
+# model.build((None,)+IMAGE_SIZE)
+model.build(IMAGE_SIZE)
+
+# %% Testing layers
+zeroes = tf.constant(0, dtype = tf.int32, shape = IMAGE_SIZE ) # make a zeroes image
+ed_zeroes = tf.expand_dims(zeroes, axis=0) # Extra dimension on zeroes
+model(ed_zeroes) # Works!
+
+test_layer = hub.KerasLayer(model_handle, trainable=False, dtype = tf.int32, input_shape = IMAGE_SIZE)
+
+# %% Playground with strings
+embedding_test = "https://tfhub.dev/google/nnlm-en-dim50/2"
+test_strings = hub.KerasLayer(embedding_test, input_shape = [], dtype = tf.string, trainable=True)
+small_str = tf.constant(np.array([b'test']),  dtype=tf.string)
+test_strings(small_str)
