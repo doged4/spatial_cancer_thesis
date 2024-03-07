@@ -263,7 +263,9 @@ all_ssgs_results_adata.var.loc[all_ssgs_results_adata.var['highly_variable']]
 #%% ERB2 expression
 sc.pl.spatial(all_ssgs_results_adata,layer='nes', img_key="hires", color = ["ERB2 UP.V1 UP", "LTE2 UP.V1 UP"])
 sc.pl.spatial(all_ssgs_results_adata,layer='nes', img_key="hires", color = ["BCAT BILD ET AL UP"])
-	
+# %%
+sc.pp.calculate_qc_metrics(s8t2_adata,  inplace=True) 
+sc.pl.spatial(s8t2_adata, img_key="hires", color=["total_counts", "n_genes_by_counts"]) 
 # %%[markdown]
 # We should confirm that this is not simply the regions in which gene counts appear.
 #%% 
