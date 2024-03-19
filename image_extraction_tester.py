@@ -14,7 +14,8 @@ import numpy as np
 from image_extracter import image_extracter
 
 # %% Load in data
-s8t2_adata = ad.read_h5ad("./intermediate_data/33D_S8T2.h5ad")
+# s8t2_adata = ad.read_h5ad("./intermediate_data/33D_S8T2.h5ad")
+s8t2_adata = ad.read_h5ad("./intermediate_data/s8t2_all_at_once_enrichments.h5ad")
 
 # %% Set up image extracter
 # extracter = image_extracter()
@@ -136,11 +137,13 @@ logging.debug(f"End: {process_time()}\n")
 # ## Tensorflow training syntax method. See here [https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html] for inspiration.
 # %%
 # # put some of below into image extracter
-# import tensorflow as tf
-
-# second_generator = big_im_container.generate_spot_crops(s8t2_adata, 
-#                                                  return_obs=True)
-# dataset = tf.data.Dataset.from_tensor_slices ([x for x in second_generator])
+import tensorflow as tf
+big_im_container = sq.im.ImageContainer()
+big_im_container.add_img(R".\original_data\High-resolution_tissue_images\V10F03-033\201210_BC_V10F03-033_S8C-T_RJ.D1-Spot000001.jpg")
+# Seems to use the adata.uns and the spatial coords in adata to get image?
+second_generator = big_im_container.generate_spot_crops(s8t2_adata, 
+                                                 return_obs=True)
+dataset = tf.data.Dataset.from_tensor_slices ([x for x in second_generator])
 # # tf.data.Dataset.from_generator # seems to be not parallelizable according to those online
 # spot_names = tf.data.Dataset.from_tensor_slices(s8t2_adata.obs_names) # takes a while but may end up faster?
 
@@ -151,3 +154,5 @@ logging.debug(f"End: {process_time()}\n")
 # embedding = model.predict [still use image_extracter]
 # construct new anndata from embeddings
 # Then merge in old anndata columns with new?
+
+# %%
