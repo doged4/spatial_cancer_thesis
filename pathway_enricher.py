@@ -13,31 +13,37 @@ import plotnine as pn
 # %% Load in all data
 # Get paths
 main_config = pd.read_csv("./image_inputters/main_config.csv") 
-# gets 33A for V10F03-033_A
-main_config["readable_id"] = [x[3][:3] for x in 
+# Gets slide id like 33A for V10F03-033_A
+main_config["readable_id"] = [x[-1][:3] for x in 
                                     main_config.loc[:,"true_annotation_path"].str.split("/")]
-# get patient ids
-main_config.loc[main_config['biopsy_sample_id'].isna(),'biopsy_sample_id'] = 'unknown-x-x'
+
+# Get patient id
+if sum(main_config['biopsy_sample_id'].isna()) > 0:
+    main_config.loc[main_config['biopsy_sample_id'].isna(),'biopsy_sample_id'] = 'unknown-x-x'
+    raise RuntimeWarning("There appears to be a nonlabelled sample")
+
 main_config['patient'] = [x[0] for x in main_config['biopsy_sample_id'].str.split(pat = "-")]
 main_config.set_index('readable_id', drop=False, inplace=True)
 
-# Get adatas
+# Load in adatas
 adatas = dict()
 for row in main_config.iterrows():
     single_adata = sc.read_visium(row[1]["spaceranger_path"] + "/outs/")
     single_adata.var_names_make_unique(join = "_")
+
     # Keep track of attributes of each sample in the unstructured region
     single_adata.uns['slide_id'] = row[1]['slide_id']
     single_adata.uns['biopsy_sample_id'] = row[1]['biopsy_sample_id'].replace('-','')
     single_adata.uns['biopsy_expected_classification'] = row[1]['expected_classification']
     single_adata.uns['biopsy_annotated_classification'] = row[1]['annotated_classification']
     single_adata.uns['patient'] = row[1]['patient']
-
+    
+    # Save to dict
     adatas[row[1]["readable_id"]] = single_adata
 
 
 # Integrate annotations from pathologist
-paths_to_classification = "image_inputters/cleaned_classification_wenwen"
+paths_to_classification = "intermediate_data/classification/cleaned_classification_wenwen"
 
 for key in adatas.keys():
     # Read in spot classifications from pathologist annotations (see : image_inputters\cevi_altering_loupebrowser_parser.ipynb)
