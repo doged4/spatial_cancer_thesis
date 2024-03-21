@@ -12,7 +12,7 @@ import plotnine as pn
 
 # %% Load in all data
 # Get paths
-main_config = pd.read_csv("./image_inputters/main_config.csv") 
+main_config = pd.read_csv("./classify/main_config.csv") 
 # Gets slide id like 33A for V10F03-033_A
 main_config["readable_id"] = [x[-1][:3] for x in 
                                     main_config.loc[:,"true_annotation_path"].str.split("/")]

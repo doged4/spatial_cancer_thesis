@@ -1,0 +1,49 @@
+,annotations,new_label,mapping
+0,fat,normal,0
+1,fat+stroma,normal,0
+2,invasive ca,cancer,1
+3,invasive ca with mucin,cancer,1
+4,invasive ca with some mucin,cancer,1
+5,stroma,normal,0
+6,calcification,normal,0
+7,dcis?,dcis,1
+8,calcification+normal glands,normal,0
+9,cluster fat+stroma,normal,0
+10,normal glands,normal,0
+11,cluster stroma,normal,0
+12,glands+stroma,normal,0
+13,stroma+fat,normal,0
+14,fat+storma,normal,0
+15,dcis mucin,dcis,1
+16,?stroma,normal,0
+17,stroma?,normal,0
+18,dcis,dcis,1
+19, , ,-1
+20,fat+normal gland,normal,0
+21,background?,normal,0
+22,?glands?stroma,normal,0
+23,? dcis ,dcis,1
+24,hyperplasia?,normal,0
+25,background,normal,0
+26,dcis or lcis,dcis,1
+27,dcis+lcis,dcis,1
+28,invasive ?,cancer,1
+29,? invasive ca?,cancer,1
+30,mainly stroma with few ca,cancer,1
+31,dcis and ? hyperplasia,dcis,1
+32,stroma and glands,normal,0
+33,glands,normal,0
+34,invasive ca?,cancer,1
+35,?invasive ca,cancer,1
+36,dcis+stroma,dcis,1
+37,invasive ca or lymphocytes?,cancer,1
+38,? invasive ca,cancer,1
+39,? ca,cancer,1
+40,?ca,cancer,1
+41,benign breast, normal, 0
+42,tumor,cancer,1
+43,nan,no_annotation,-1
+44,out,unclear,-1
+45,stroma,normal,0
+46,fat,normal,0
+47,immune cells,normal,0
