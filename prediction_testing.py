@@ -130,6 +130,7 @@ def model2(im_features_ad, enrichments_ad):
 
 if __name__ == '__main__':
     logging.basicConfig(filename="model_training.log", format='%(asctime)s - %(message)s', level=logging.DEBUG)
+    logging.debug(f"Running prediction_testing.py")
     logging.debug(f"Started Model CV MT Elasticnet Training\n")
 
     im_features_ad = read_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5ad")
