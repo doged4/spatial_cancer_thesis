@@ -137,22 +137,85 @@ logging.debug(f"End: {process_time()}\n")
 # ## Tensorflow training syntax method. See here [https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html] for inspiration.
 # %%
 # # put some of below into image extracter
-import tensorflow as tf
-big_im_container = sq.im.ImageContainer()
-big_im_container.add_img(R".\original_data\High-resolution_tissue_images\V10F03-033\201210_BC_V10F03-033_S8C-T_RJ.D1-Spot000001.jpg")
-# Seems to use the adata.uns and the spatial coords in adata to get image?
-second_generator = big_im_container.generate_spot_crops(s8t2_adata, 
-                                                 return_obs=True)
-dataset = tf.data.Dataset.from_tensor_slices ([x for x in second_generator])
-# # tf.data.Dataset.from_generator # seems to be not parallelizable according to those online
-# spot_names = tf.data.Dataset.from_tensor_slices(s8t2_adata.obs_names) # takes a while but may end up faster?
+# import tensorflow as tf
+# big_im_container = sq.im.ImageContainer()
+# big_im_container.add_img(R".\original_data\High-resolution_tissue_images\V10F03-033\201210_BC_V10F03-033_S8C-T_RJ.D1-Spot000001.jpg")
+# # Seems to use the adata.uns and the spatial coords in adata to get image?
+# second_generator = big_im_container.generate_spot_crops(s8t2_adata, 
+#                                                  return_obs=True)
+# dataset = tf.data.Dataset.from_tensor_slices ([x for x in second_generator])
+# # # tf.data.Dataset.from_generator # seems to be not parallelizable according to those online
+# # spot_names = tf.data.Dataset.from_tensor_slices(s8t2_adata.obs_names) # takes a while but may end up faster?
 
 
 # # make tf dataset from slice
 #   using generate_image_crops
 # zip with labels (here just names?)
-# embedding = model.predict [still use image_extracter]
-# construct new anndata from embeddings
-# Then merge in old anndata columns with new?
+# # embedding = model.predict [still use image_extracter]
+# # construct new anndata from embeddings
+# # Then merge in old anndata columns with new?
 
+# %%
+# See here for advice: https://stackoverflow.com/questions/74056685/create-tensorflow-dataset-from-list-files
+import tensorflow as tf
+# filenames = tf.data.Dataset.list_files("intermediate_data/patched_data/V10F03-033_A/patches/*", shuffle=False)
+filenames = tf.data.Dataset.list_files("intermediate_data/patched_data/V10F03-033_D/patches/*", shuffle=False)
+
+def read_image (path):
+    image_tensor =  tf.image.decode_image(tf.io.read_file(path))
+    return tf.expand_dims(image_tensor, axis=0)
+    
+
+def read_spot_name (path):
+    pathname = path.numpy().decode('ascii')
+    filename = pathname.split("\\")[-1]
+    split_file_name = filename.split("_")
+    barcode = split_file_name[2]
+    slide_id = split_file_name[0][-2:] + split_file_name[1]
+
+    return barcode + '_' + slide_id
+
+image_set = filenames.map(read_image)
+names = [read_spot_name(x) for x in filenames]
+# # %%
+new_extracter = image_extracter(image_size=(380, 380, 3))
+new_extracter.prep_model()
+
+image_results = new_extracter.model.predict(image_set, use_multiprocessing=True)
+# This runs! Very quicky
+# TODO: Confirm image features are the same between implementation
+# Minor issues
+#   Names still not identical between when patches generated and way of referring to spots
+#   Image features may not be the same across each? Or are spot names just wrong
+# TODO: if possible integrate the predict call into image_extracter
+
+image_feature_df = pd.DataFrame(
+    data = image_results,
+    index = names,
+    columns = [f"feature_{i}" for i in range(image_results.shape[1])]
+)
+
+with_image_features = ad.read_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5ad")
+print(with_image_features.to_df().filter(regex = "AAACAAGTATCTCCCA", axis=0))
+print(image_feature_df.filter(regex = "AAACAAGTATCTCCCA", axis=0))
+
+
+# %% Fix the file contents
+with_image_features = ad.read_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5ad")
+# with_enrichments = ad.read_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
+
+just_image_features = ad.AnnData(
+    X = with_image_features.obsm['im_features'],
+    obs=with_image_features.obs,
+    obsm=with_image_features.obsm,
+    uns = with_image_features.uns
+)
+del just_image_features.obsm['im_features']
+just_image_features.write_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5ad")
+
+with_enrichments = ad.read_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
+with_enrichments.layers['nonnormalized'] = with_enrichments.X
+with_enrichments.X = with_enrichments.layers['nes']
+del with_enrichments.layers['nes']
+with_enrichments.write_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
 # %%
