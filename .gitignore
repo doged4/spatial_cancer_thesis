@@ -8,3 +8,6 @@ im_features
 cnn_feature_models
 tools/caffe-tensorflow-python3/
 .DS_Store
+meeting notes
+*.jpg
+*.xlsx
