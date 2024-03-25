@@ -177,12 +177,12 @@ def read_spot_name (path):
 
 image_set = filenames.map(read_image)
 names = [read_spot_name(x) for x in filenames]
-# # %%
+# %%
 new_extracter = image_extracter(image_size=(380, 380, 3))
 new_extracter.prep_model()
 
 image_results = new_extracter.model.predict(image_set, use_multiprocessing=True)
-# This runs! Very quicky
+# This runs! Very quickly
 # TODO: Confirm image features are the same between implementation
 # Minor issues
 #   Names still not identical between when patches generated and way of referring to spots
@@ -199,6 +199,22 @@ with_image_features = ad.read_h5ad("intermediate_data/with_image_features_33D_S8
 print(with_image_features.to_df().filter(regex = "AAACAAGTATCTCCCA", axis=0))
 print(image_feature_df.filter(regex = "AAACAAGTATCTCCCA", axis=0))
 
+# %% Pipeline for extraction
+# This works
+
+# %% Map spots
+
+# %% 
+prev_imfeatures = ad.read_h5ad('intermediate_data/with_image_features_33D_S8T2_2.h5ad')
+# %% Image feature extraction in batch
+image_feature_df.to_csv("intermediate_data/bigbatch_im_features.csv")
+
+image_feature_df_1 = pd.read_csv("intermediate_data/bigbatch_im_features.csv", index_col=0)
+image_feature_df_1 = image_feature_df_1.astype(dtype='float32')
+ 
+image_feature_df == image_feature_df_1
+# %% [markdown]
+# It seems like it worked!
 
 # %% Fix the file contents
 with_image_features = ad.read_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5ad")
@@ -218,4 +234,50 @@ with_enrichments.layers['nonnormalized'] = with_enrichments.X
 with_enrichments.X = with_enrichments.layers['nes']
 del with_enrichments.layers['nes']
 with_enrichments.write_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
+# %%
+
+
+
+# %% [markdown]
+# ## Big Run
+import os
+import logging
+
+logging.basicConfig(filename="log_image_extraction_tester.log", format='%(asctime)s - %(message)s', level=logging.DEBUG)
+
+logging.debug("Starting batch extraction")
+# Converter from slide to biopsy name
+config = pd.read_csv('classify/main_config.csv')
+
+config['simple_biopsy_sample_id'] = config['biopsy_sample_id'].map(
+    lambda x: x[:-4] + x[-3] + x[-1]
+)
+slide_to_biopsy_converter = {}
+for _, (sample_id, biopsy_sample_id) in config[['sample_id', 'simple_biopsy_sample_id']].iterrows():
+    slide_to_biopsy_converter[sample_id] = biopsy_sample_id
+
+# Load in model
+new_extracter = image_extracter(image_size=(380, 380, 3))
+new_extracter.prep_model()
+
+# 
+INPUTS_DIR = "intermediate_data/patched_data/"
+OUTPUTS_DIR = "intermediate_data/batch_extracted_adatas"
+logging.debug("Starting extraction loop")
+for folder in os.listdir(INPUTS_DIR):
+    logging.debug(f"Starting {folder}")
+    # print(folder)
+    path = os.path.join(INPUTS_DIR, folder, "patches")
+    simple_biopsy_id = slide_to_biopsy_converter[folder]
+    new_extracter.image_set_from_path(path, 
+                                      in_place = True)
+    adata_result = new_extracter.extract_from_imageset_adata(
+        name_append = f"_{simple_biopsy_id}" 
+    )
+    adata_result.write_h5ad(
+        os.path.join(OUTPUTS_DIR, f"{simple_biopsy_id}_im.h5ad"))
+    logging.debug(f"{folder} written")
+
+logging.debug("Batch extractions done")
+
 # %%
