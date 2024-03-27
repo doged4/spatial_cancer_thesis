@@ -136,9 +136,11 @@ mt_elnet.intercept_
 # %% [markdown]
 # Let's look at our coefficients
 mt_elnet.coef_
+# %% [markdown]
 # Seems like a lot of zeroes... how many features aren't included?
 # Every feature that is all zero:
-sum([all([x == 0 for x in y]) for y in mt_elnet.coef_.transpose()])
+num_unused = sum([all([x == 0 for x in y]) for y in mt_elnet.coef_.transpose()])
+print(f"{len(mt_elnet.feature_names_in_)-num_unused}/{len(mt_elnet.feature_names_in_)} features used")
 # What is not all zeroes?
 used_features = [not all([x == 0 for x in y]) for y in mt_elnet.coef_.transpose()]
 used_features_names = mt_elnet.feature_names_in_[used_features]
@@ -150,13 +152,18 @@ im_features_ad = read_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5a
 enrichments_ad = read_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
 
 # This doesn't seem good
-mt_elnet.score(
+score = mt_elnet.score(
     X = im_features_ad.to_df(),
     y = enrichments_ad.to_df()
 )
+print(f"R^2 is {score}")
+# %% [markdown]
+# This is our R^2 value. It is concerning that it is so low.
 # %% [markdown]
 # That's not good! That's quite concerning. What do these features look like?
-sc.pl.spatial(im_features_ad, color = used_features_names)
+sc.pl.spatial(im_features_ad, 
+              color = used_features_names, 
+              bw=True) # bw for clarity
 # %% [markdown]
 # It looks like these image features are pretty sparse. This could mean a couple of things.
 # I trust the regularization, but let's go back to figure out what the best model would capture.
@@ -169,7 +176,7 @@ print(linear_output.score(
     X = im_features_ad.to_df(),
     y = enrichments_ad.to_df()))
 # %% [markdown]
-# Seems like a lot of our features are being eliminated. This could either mean that our regulization is too agressive, or that we just do not have any significantly effective features.
+# Seems like a lot of our features are being eliminated. This could either mean that our regulization is too agressive, or that we just do not have enough nonsparse features.
 # This leaves us with two options:
 # 
 # * Refit the model with different parameters
