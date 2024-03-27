@@ -29,8 +29,9 @@ s8t2_adata = ad.read_h5ad("./intermediate_data/s8t2_all_at_once_enrichments.h5ad
 # # %% Set up image container with image
 # im_container = sq.im.ImageContainer()
 # im_container = im_container.from_adata(s8t2_adata)
-# TODO: This initializes with the hires image
+# This initializes with the hires image
 # We want an image container full of each spot image
+# Use the spot crop generater for this
 
 # %%
 # big_im_container = sq.im.ImageContainer()
@@ -78,11 +79,7 @@ s8t2_adata = ad.read_h5ad("./intermediate_data/s8t2_all_at_once_enrichments.h5ad
 #     # n_jobs = 4,
 #     features_kwargs={"custom": {"func":  new_extracter.extract_one}})
 
-# TODO:
-#   Either
-#       make image container with pretiled images, see what attaches them to previous location
-#       or make image container filetype work with image_extracter class
-#           seems to have extra dimension?
+
 #   Look at this guide for help? https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html
 # %%[markdown]
 # ## For loop method
@@ -134,7 +131,7 @@ logging.debug(f"End: {process_time()}\n")
 
 # s8t2_adata_with_imfeatures = ad.read_h5ad("./intermediate_data/with_image_features_33D_S8T2_2.h5ad")
 # %%[markdown]
-# ## Tensorflow training syntax method. See here [https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html] for inspiration.
+# Tensorflow training syntax method. See here [https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html] for inspiration.
 # %%
 # # put some of below into image extracter
 # import tensorflow as tf
@@ -182,8 +179,11 @@ new_extracter = image_extracter(image_size=(380, 380, 3))
 new_extracter.prep_model()
 
 image_results = new_extracter.model.predict(image_set, use_multiprocessing=True)
+# %% [markdown]
 # This runs! Very quickly
-# TODO: Confirm image features are the same between implementation
+# This does not run the same as using the spot cropped images, but does run consistent
+# with self. It seems like they are pretty different, event though all that this added
+# is 3 pixels in each direction
 # Minor issues
 #   Names still not identical between when patches generated and way of referring to spots
 #   Image features may not be the same across each? Or are spot names just wrong
@@ -240,6 +240,7 @@ with_enrichments.write_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad
 
 # %% [markdown]
 # ## Big Run
+# Run through each set of presliced images and make image feature adatas.
 import os
 import logging
 
@@ -280,4 +281,5 @@ for folder in os.listdir(INPUTS_DIR):
 
 logging.debug("Batch extractions done")
 
+# TODO: integrate uns, obsm, and other obs values to allow for plotting and comparison
 # %%
