@@ -1,0 +1,8 @@
+,annotations, new_label, mapping
+0,benign breast, normal, 0
+1,tumor, cancer, 1
+2,nan, no_annotation, -1
+3,out, unclear, -1
+4,stroma, normal, 0
+5,fat, normal, 0
+6,immune cells, normal, 0

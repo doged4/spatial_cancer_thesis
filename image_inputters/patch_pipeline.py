@@ -5,7 +5,7 @@
 #       Previous pipeline kept all of the sample dictionaries in one list, and each dictionary contained the full, high, and patch image data (in color and gray)
 
 # Structure:
-# patched_data
+# intermediate_data\patched_data
 # |-- sample
 #     |-- full res
 #     |-- hi res
@@ -30,8 +30,8 @@ import pickle
 os.chdir("/Users/cbainton/Desktop/ST_project")
 
 PATCH_SIZE = 480
-CONFIG_FILE_PATH = ".\image_inputters\main_config_altered.csv"
-OUTPUT_PATH = "patched_data_480"
+CONFIG_FILE_PATH = "./classify/main_config.csv"
+OUTPUT_PATH = "intermediate_data\patched_data_480"
 
 config = pd.read_csv(CONFIG_FILE_PATH)
 

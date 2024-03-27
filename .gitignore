@@ -1,7 +1,7 @@
 original_data
-patched_data
-cleaned_classification
-patched_data_480
+intermediate_data/patched_data
+cleaned_classification*
+intermediate_data/patched_data_480
 tf_dataset
 old_im_features
 im_features
@@ -11,3 +11,6 @@ tools/caffe-tensorflow-python3/
 meeting notes
 *.jpg
 *.xlsx
+__pycache__
+intermediate_data/im_features_s8t2.csv
+*.log

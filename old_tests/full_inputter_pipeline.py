@@ -25,7 +25,7 @@ os.chdir("/Users/cbainton/Desktop/ST_project")
 # %% From cevis_A-img_loader_anno_multi.py
 
 # Specify the path of config file
-CONFIG_FILE_PATH = ".\image_inputters\main_config_altered.csv"
+CONFIG_FILE_PATH = "./classify/main_config.csv"
 
 # Read config file with mapping of SpaceRanger output folders to full-resolution images
 config = pd.read_csv(CONFIG_FILE_PATH)
