@@ -234,7 +234,26 @@ with_enrichments.layers['nonnormalized'] = with_enrichments.X
 with_enrichments.X = with_enrichments.layers['nes']
 del with_enrichments.layers['nes']
 with_enrichments.write_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
-# %%
+# %% [markdown]
+# ## Combining with our gene set data
+# Let's get everything in one adata
+# %% 
+with_enrichments = ad.read_h5ad("intermediate_data/s8t2_all_at_once_enrichments.h5ad")
+just_image_features =  ad.read_h5ad("intermediate_data/with_image_features_33D_S8T2_2.h5ad")
+
+# Check what would be removed with 'inner' join
+assert with_enrichments.shape[0] == just_image_features.shape[0]
+
+combined_enr_im_ad = ad.concat(
+    [with_enrichments, just_image_features],
+    axis = 1,
+    join = 'inner', # better keep what they both have
+    merge = 'same', # better keep what they both have!
+    uns_merge = 'first' # keep enrichments uns
+)
+
+combined_enr_im_ad.write("intermediate_data/s8t2_combined_enr_im.h5ad")
+
 
 
 
