@@ -295,3 +295,49 @@ ssgs_results_with_p = gseapy.ssgsea(
 
 elapsed = process_time() - tstart
 print(f"{elapsed} elapsed seconds for all_together")
+
+
+# %% [markdown]
+# ## Running with Breast Cancer Signatures
+# We can test with a new set of molecular signatures
+
+# %%
+import logging 
+
+logging.basicConfig(filename= "pathway_enrichments.log", format='%(asctime)s - %(message)s', level=logging.DEBUG)
+
+
+GMT_FILE = 'intermediate_data/external_data/genesets.all_breast_keyword.hsapiens.gmt'
+
+sample = "33D_S8T2_filtered"
+sample_shortname = sample # sample[-4:].lower()
+
+
+gene_counts_adata = ad.read_h5ad(f"./intermediate_data/{sample}.h5ad")
+
+logging.debug(f"Starting enrichments for {sample}")
+# Get enrichments
+all_ssgs_results = gseapy.ssgsea(
+        data=gene_counts_adata.to_df().T,
+        gene_sets=GMT_FILE
+        )
+logging.debug(f"Enrichments complete for {sample}")
+logging.debug("Converting to adata")
+# Collect results and save as anndata
+enrichments = all_ssgs_results.res2d.pivot(columns='Term',index='Name')
+enrichments = enrichments.astype('float')
+
+all_ssgs_results_adata = ad.AnnData(
+    X = enrichments['NES'], # save NORMALIZED
+    obs=gene_counts_adata.obs,
+    var = pd.DataFrame(data = {'term' : list(enrichments['ES'].columns)},
+                        index = list(enrichments['ES'].columns)),
+    uns=gene_counts_adata.uns,
+    obsm=gene_counts_adata.obsm,
+    layers={'nonnormalized' : enrichments['ES']}
+)
+# Save anndata
+all_ssgs_results_adata.write_h5ad(f"intermediate_data/{sample_shortname}_bc_sig_enrichments.h5ad")
+logging.debug(f"Saved to intermediate_data/{sample_shortname}_bc_sig_enrichments.h5ad")
+
+logging.debug("Enrichments complete")
