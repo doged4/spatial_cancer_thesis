@@ -419,12 +419,17 @@ plt.hist(new_qc_output.filter(regex="T\d$", axis = 0).loc[:,'log1p_total_counts'
 # plt.legend()
 plt.title('Log1p counts per cell: blue is all, orange is just disease')
 
+# %% Save for testing elsewhere
+adatas['33D'].write("./intermediate_data/33D_S8T2.h5ad")
+adatas['33B'].write("./intermediate_data/33B_S8C2.h5ad")
+
 
 # %% [markdown]
 # # Potential simple spot filter
 # We filter our spots to be below some threshold. What threshold should that be?
 # %%
-s8t2 = adatas['33D']
+s8t2 = ad.read_h5ad("./intermediate_data/33D_S8T2.h5ad")
+# s8t2 = adatas['33D']
 sc.pp.calculate_qc_metrics(s8t2, inplace=True)
 s8t2.obs['total_counts'].hist()
 s8t2.obs['log1p_total_counts'].hist()
@@ -446,10 +451,6 @@ sc.pl.spatial(s8t2[s8t2.obs['total_counts'] > 100, :], color = 'log1p_n_genes_by
 CUTOFF = 100
 s8t2_filtered = s8t2[s8t2.obs['total_counts'] > CUTOFF, :].copy()
 s8t2_filtered.write("./intermediate_data/33D_S8T2_filtered.h5ad")
-
-# %% Save for testing elsewhere
-adatas['33D'].write("./intermediate_data/33D_S8T2.h5ad")
-adatas['33B'].write("./intermediate_data/33B_S8C2.h5ad")
 
 # %% Run Satija (Seurat) filterer
 # Filter genes for at least a count
