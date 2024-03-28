@@ -159,6 +159,12 @@ score = mt_elnet.score(
 print(f"R^2 is {score}")
 # %% [markdown]
 # This is our R^2 value. It is concerning that it is so low.
+# %%
+from yellowbrick.regressor import ResidualsPlot
+resids = ResidualsPlot(mt_elnet)
+resids.fit(
+    X = im_features_ad.to_df(),
+    y = enrichments_ad.to_df())
 # %% [markdown]
 # That's not good! That's quite concerning. What do these features look like?
 sc.pl.spatial(im_features_ad, 
@@ -175,6 +181,7 @@ linear_output.fit(
 print(linear_output.score(
     X = im_features_ad.to_df(),
     y = enrichments_ad.to_df()))
+#
 # %% [markdown]
 # Seems like a lot of our features are being eliminated. This could either mean that our regulization is too agressive, or that we just do not have enough nonsparse features.
 # This leaves us with two options:
