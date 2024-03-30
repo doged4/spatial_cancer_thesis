@@ -86,26 +86,28 @@ class image_extracter:
         return self.model(im_tensor)
     
 
-    def image_set_from_path(self, path, in_place = True):
+    def image_set_from_path(self, path, in_place = True, name_append = ""):
         """From path to folder of images generate tensorflow image dataset"""
-        path_as_glob = path
-        if path[-1] != '*':
-            if path[-1] == '/':
-                path_as_glob += '*'
-            else:
-                path_as_glob += '/*'
-
-        self._filenames = tf.data.Dataset.list_files(path_as_glob, shuffle=False)
+        if type(path) == str:
+            path_as_glob = path
+            if path[-1] != '*':
+                if path[-1] == '/':
+                    path_as_glob += '*'
+                else:
+                    path_as_glob += '/*'
+            self._filenames = tf.data.Dataset.list_files(path_as_glob, shuffle=False)
+        elif type(path) == list:
+            self._filenames = tf.data.Dataset.list_files(path, shuffle=False)
 
         if in_place:
             self.image_set = {
                 'images': self._filenames.map(image_extracter._read_image),
-                'names' : [image_extracter._read_spot_name(x) for x in self._filenames]
+                'names' : [image_extracter._read_spot_name(x) + name_append for x in self._filenames]
             }
         else:
             return {
                 'images': self._filenames.map(image_extracter._read_image),
-                'names' : [image_extracter._read_spot_name(x) for x in self._filenames]
+                'names' : [image_extracter._read_spot_name(x) + name_append for x in self._filenames]
             }
 
     @staticmethod
