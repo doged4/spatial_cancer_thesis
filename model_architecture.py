@@ -5,6 +5,7 @@ from anndata import read_h5ad
 from sklearn.model_selection import train_test_split
 # from pandas import DataFrame
 import image_extracter
+from pandas import DataFrame
 
 # Inspired somewhat by this page: https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html
 
@@ -100,8 +101,9 @@ model_loss = model.fit(
 )
 # %% 
 # Save model
-TEST_NAME = 'test1'
-model.save('models/{TEST_NAME}.keras')
+TEST_NAME = 'test2'
+model.save(f"models/{TEST_NAME}.keras")
+DataFrame(model_loss.history).to_csv(f"models/{TEST_NAME}_history.csv")
 # %% 
 # Run and log
 import logging
@@ -122,7 +124,8 @@ logging.debug(f"Params are:{
         'BIOPSY_ID_ADDED' : BIOPSY_ID_ADDED,
         'ACTIVATION_FUNC' : ACTIVATION_FUNC,
         'LEARNING_RATE' : LEARNING_RATE,
-        'EPOCHS' : EPOCHS
+        'EPOCHS' : EPOCHS,
+        'TEST_NAME' : TEST_NAME
     }
 }")
 
