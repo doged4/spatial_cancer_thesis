@@ -20,6 +20,8 @@ BIOPSY_ID_ADDED = '_S8T2'
 # TODO: this currently uses just C6 enrichments
 INPUT_ENRICHMENTS_PATH = "intermediate_data/s8t2_all_at_once_enrichments.h5ad"
 
+
+TEST_NAME = 'test2'
 # %% Load in enrichments
 all_enrichments = read_h5ad(INPUT_ENRICHMENTS_PATH).to_df()
 spot_names = list(all_enrichments.index) 
@@ -93,17 +95,18 @@ model.compile(optimizer = tf.keras.optimizers.Adam(learning_rate = 1e-4),
               loss = tf.keras.losses.MeanSquaredError()
               )
 # %%
-model_loss = model.fit(
-    x = train_set,
-    validation_data = test_set,
-    epochs = 10,
-    verbose = 2 # seems helpful?
-)
-# %% 
-# Save model
-TEST_NAME = 'test2'
-model.save(f"models/{TEST_NAME}.keras")
-DataFrame(model_loss.history).to_csv(f"models/{TEST_NAME}_history.csv")
+def run_fit():
+    # Fit model
+    model_loss = model.fit(
+        x = train_set,
+        validation_data = test_set,
+        epochs = 10,
+        verbose = 2 # seems helpful?
+    )
+
+    # Save model
+    model.save(f"models/{TEST_NAME}.keras")
+    DataFrame(model_loss.history).to_csv(f"models/{TEST_NAME}_history.csv")
 # %% 
 # Run and log
 import logging
@@ -128,5 +131,6 @@ logging.debug(f"Params are:{
         'TEST_NAME' : TEST_NAME
     }
 }")
+run_fit()
 
-logging.debug("Done training")
+logging.debug("Traing complete")
