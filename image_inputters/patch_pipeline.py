@@ -29,9 +29,9 @@ import pickle
 
 os.chdir("/Users/cbainton/Desktop/ST_project")
 
-PATCH_SIZE = 480
+PATCH_SIZE = 380
 CONFIG_FILE_PATH = "./classify/main_config.csv"
-OUTPUT_PATH = "intermediate_data\patched_data_480"
+OUTPUT_PATH = "intermediate_data\patched_data"
 
 config = pd.read_csv(CONFIG_FILE_PATH)
 
