@@ -24,18 +24,6 @@ DO_LOGGING = True
 
 # %% Load in data [markdown]
 # See `pathway_enricher.py` for original code
-# Get paths
-main_config = pd.read_csv("./classify/main_config.csv") 
-# Gets slide id like 33A for V10F03-033_A
-
-# Get patient id
-if sum(main_config['biopsy_sample_id'].isna()) > 0:
-    main_config.loc[main_config['biopsy_sample_id'].isna(),'biopsy_sample_id'] = 'unknown-x-x'
-    raise RuntimeWarning("There appears to be a nonlabelled sample")
-
-
-main_config.set_index('simple_slide', drop=False, inplace=True)
-
 
 def retrieve_adata(slide_index, config_df, classifications_dir):
     """From a simple slide id, the main config df for metadata, and the classification dir, return adata."""
@@ -92,7 +80,7 @@ def get_de_genes(config_df, p_filter = None, n_filter = None):
                 de_genes.sort_values(by=['p_val_adj'], inplace=True)
                 de_genes = de_genes.iloc[:n_filter, :]
             if de_genes.shape[0] < 5:
-                print(f"Be aware: {biopsy} seems to have only {de_genes.shape[0]} genes")
+                print(f"Be aware: {biopsy} seems to have only {de_genes.shape[0]}")
             de_genes_dict[f"{biopsy}_deg_set"] = list(de_genes.loc[:, 'gene'])
         else:
             print(f"Be aware: {biopsy} seems to have an empty gene list")
@@ -115,6 +103,7 @@ def filter_spots(gene_counts_ad, in_place_save = False):
 # %% Get enrichments
 def get_enrichments_ad(gene_counts_adata, gene_set, verbose_log = True, sample_name = ""):
     """Run ssGSEA on gene_counts_ad with enrichments for gene_set"""
+    # TODO: get enrichments not to drop columns??
     if verbose_log:
         logging.debug(f"Starting enrichments for {sample_name}")
     # Get enrichments
@@ -127,7 +116,7 @@ def get_enrichments_ad(gene_counts_adata, gene_set, verbose_log = True, sample_n
         logging.debug("Converting to adata")
     # Collect results and save as anndata
     enrichments = all_ssgs_results.res2d.pivot(columns='Term',index='Name')
-    print(enrichments.columns)
+    
     enrichments = enrichments.astype('float')
 
     # Collect in adata
@@ -145,6 +134,30 @@ def get_enrichments_ad(gene_counts_adata, gene_set, verbose_log = True, sample_n
     # Return anndata
     return enrichments_adata
 
+
+
+# %% 
+TEST_MODE = False
+# %% Block for testing
+if TEST_MODE:
+    config = pd.read_csv(CONFIG_PATH, index_col=0)
+    config.set_index('simple_biopsy', drop = False, inplace = True)
+    config['patient'] = [x[0] for x in config['biopsy_sample_id'].str.split(pat = "-")]
+
+    gene_set = get_de_genes(config, p_filter=0.01)
+
+    slide_id = list(config.index)[6]
+
+    print(f"Retrieving adata {slide_id}")
+    raw_genes_ad = retrieve_adata(slide_index=slide_id, config_df=config, classifications_dir=CLASSIFICATION_DIR)
+    print("Adata retrieved")
+    print("Filtering...")
+    filtered_genes_ad = filter_spots(raw_genes_ad)
+    print("Running enrichment")
+    ssgsea_enrichments = get_enrichments_ad(filtered_genes_ad, gene_set = gene_set, verbose_log=DO_LOGGING, sample_name=slide_id)
+    ssgsea_enrichments.write(f"intermediate_data/enrichments_on_de/{slide_id}_de_gene_enrichments.h5ad")
+
+    print(f"Saved to intermediate_data/{slide_id}_bc_sig_enrichments_degenes.h5ad")
 
 # %% Get gene counts
 # %%
@@ -166,7 +179,7 @@ if __name__ == '__main__':
     config.set_index('simple_biopsy', drop = False, inplace = True)
     config['patient'] = [x[0] for x in config['biopsy_sample_id'].str.split(pat = "-")]
 
-    gene_set = get_de_genes(config)
+    gene_set = get_de_genes(config, p_filter=0.01)
 
     for slide_id in list(config.index):
         if DO_LOGGING:
