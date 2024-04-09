@@ -6,6 +6,7 @@ import pandas as pd
 import logging 
 from log_tools.StreamToLogger import StreamToLogger
 import sys
+import warnings
 
 
 import matplotlib.pyplot as plt
@@ -25,11 +26,17 @@ DO_LOGGING = True
 # %% Load in data [markdown]
 # See `pathway_enricher.py` for original code
 
-def retrieve_adata(slide_index, config_df, classifications_dir):
+def retrieve_adata(slide_index, config_df, classifications_dir, suppress_warnings = False):
     """From a simple slide id, the main config df for metadata, and the classification dir, return adata."""
     simple_slide_id = config_df.loc[slide_index, 'simple_slide']
 
-    single_adata = sc.read_visium(config_df.loc[slide_index, "spaceranger_path"] + "/outs/")
+    if suppress_warnings:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            single_adata = sc.read_visium(config_df.loc[slide_index, "spaceranger_path"] + "/outs/")
+    else:
+        single_adata = sc.read_visium(config_df.loc[slide_index, "spaceranger_path"] + "/outs/")
+        
     single_adata.uns['biopsy_sample_id'] = config_df.loc[slide_index, 'biopsy_sample_id'].replace('-','')
     single_adata.uns['biopsy_expected_classification'] = config_df.loc[slide_index, 'expected_classification']
     single_adata.uns['biopsy_annotated_classification'] = config_df.loc[slide_index, 'annotated_classification']
@@ -68,7 +75,7 @@ def retrieve_adata(slide_index, config_df, classifications_dir):
 
     
 # %% Get gene sets
-def get_de_genes(config_df, p_filter = None, n_filter = None):
+def get_de_genes(config_df, p_filter = None, n_filter = None, split_fc = False):
     """Return dict of significantly differentially expressed genes for sample in main config"""
     de_genes_dict = {}
     for biopsy, path in zip(config_df['simple_biopsy'], config_df['deg_path']):
@@ -76,12 +83,26 @@ def get_de_genes(config_df, p_filter = None, n_filter = None):
         if 'gene' in de_genes.columns:
             if p_filter != None:
                 de_genes = de_genes.loc[de_genes['p_val_adj'] <= p_filter,:]
+            if split_fc:
+                up_de_genes = de_genes.loc[de_genes['avg_log2FC'] > 0,:]
+                dn_de_genes = de_genes.loc[de_genes['avg_log2FC'] < 0,:]
             if n_filter != None:
-                de_genes.sort_values(by=['p_val_adj'], inplace=True)
-                de_genes = de_genes.iloc[:n_filter, :]
+                if split_fc:
+                    # Filters count once for each of them
+                    up_de_genes.sort_values(by=['p_val_adj'], inplace=True)
+                    up_de_genes = up_de_genes.iloc[:n_filter, :]
+                    dn_de_genes.sort_values(by=['p_val_adj'], inplace=True)
+                    dn_de_genes = dn_de_genes.iloc[:n_filter, :]
+                else:
+                    de_genes.sort_values(by=['p_val_adj'], inplace=True)
+                    de_genes = de_genes.iloc[:n_filter, :]
             if de_genes.shape[0] < 5:
                 print(f"Be aware: {biopsy} seems to have only {de_genes.shape[0]}")
-            de_genes_dict[f"{biopsy}_deg_set"] = list(de_genes.loc[:, 'gene'])
+            if split_fc:
+                de_genes_dict[f"{biopsy}_deg_set_up"] = list(up_de_genes.loc[:, 'gene'])
+                de_genes_dict[f"{biopsy}_deg_set_dn"] = list(dn_de_genes.loc[:, 'gene'])
+            else:
+                de_genes_dict[f"{biopsy}_deg_set"] = list(de_genes.loc[:, 'gene'])
         else:
             print(f"Be aware: {biopsy} seems to have an empty gene list")
     return de_genes_dict
@@ -101,16 +122,25 @@ def filter_spots(gene_counts_ad, in_place_save = False):
         return gene_counts_ad[gene_counts_ad.obs['total_counts'] > CRITERIA, :]
         
 # %% Get enrichments
-def get_enrichments_ad(gene_counts_adata, gene_set, verbose_log = True, sample_name = ""):
+def get_enrichments_ad(gene_counts_adata, gene_set, verbose_log = True, sample_name = "", suppress_warnings = False):
     """Run ssGSEA on gene_counts_ad with enrichments for gene_set"""
     # TODO: get enrichments not to drop columns??
     if verbose_log:
         logging.debug(f"Starting enrichments for {sample_name}")
     # Get enrichments
-    all_ssgs_results = gseapy.ssgsea(
-            data=gene_counts_adata.to_df().T,
-            gene_sets=gene_set
-            )
+    if suppress_warnings:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            all_ssgs_results = gseapy.ssgsea(
+                    data=gene_counts_adata.to_df().T,
+                    gene_sets=gene_set
+                    )
+    else:
+        all_ssgs_results = gseapy.ssgsea(
+                data=gene_counts_adata.to_df().T,
+                gene_sets=gene_set
+                )
+
     if verbose_log:
         logging.debug(f"Enrichments complete for {sample_name}")
         logging.debug("Converting to adata")
@@ -130,7 +160,7 @@ def get_enrichments_ad(gene_counts_adata, gene_set, verbose_log = True, sample_n
         layers={'nonnormalized' : enrichments['ES']}
         )
     if verbose_log:
-        logging.debug("Enrichments complete")
+        logging.debug("Enrichments as adata complete")
     # Return anndata
     return enrichments_adata
 
@@ -159,40 +189,55 @@ if TEST_MODE:
 
     print(f"Saved to intermediate_data/{slide_id}_bc_sig_enrichments_degenes.h5ad")
 
+# %% 
+BACKGROUND = False
+SUPPRESS_WARNINGS = False
 # %% Get gene counts
 # %%
+OUT_DIR = "intermediate_data/enrichments_on_updn_de"
 if __name__ == '__main__':
     
     if DO_LOGGING:
         log = logging.getLogger('log_all')
-        sys.stdout = StreamToLogger(log, logging.INFO)
-        sys.stderr = StreamToLogger(log, logging.ERROR)
+        sys.stdout = StreamToLogger(log, logging.INFO, background=BACKGROUND)
+        sys.stderr = StreamToLogger(log, logging.ERROR, background=BACKGROUND)
 
         logging.basicConfig(filename= "pathway_enrichments.log", 
                             format='%(asctime)s - %(message)s', 
                             level=logging.DEBUG, filemode='a')
-        logging.debug("Starting TEST run")
+        logging.debug("Starting Main run")
     
-
-    
+        
     config = pd.read_csv(CONFIG_PATH, index_col=0)
     config.set_index('simple_biopsy', drop = False, inplace = True)
     config['patient'] = [x[0] for x in config['biopsy_sample_id'].str.split(pat = "-")]
 
-    gene_set = get_de_genes(config, p_filter=0.01)
+    # FILTER PATIENT LIST
+    config = config.loc[config.loc[:, 'annotated_classification'] == 'Tumor' ,:]
+    print("Patient list here")
+    print(config)
 
+    # gene_set = get_de_genes(config, p_filter=0.01)
+    gene_set = get_de_genes(config, n_filter=100, split_fc=True)
+    print("Using this gene set")
+    print(gene_set.keys())
+
+    if DO_LOGGING:
+        logging.debug("Starting enrichments")
+    
     for slide_id in list(config.index):
         if DO_LOGGING:
             logging.debug(f"Retrieving adata {slide_id}")
-        raw_genes_ad = retrieve_adata(slide_index=slide_id, config_df=config, classifications_dir=CLASSIFICATION_DIR)
+        raw_genes_ad = retrieve_adata(slide_index=slide_id, config_df=config, classifications_dir=CLASSIFICATION_DIR, suppress_warnings=SUPPRESS_WARNINGS)
         if DO_LOGGING:
             logging.debug("Adata retrieved")
             logging.debug("Filtering...")
         filtered_genes_ad = filter_spots(raw_genes_ad)
         if DO_LOGGING:
             logging.debug("Running enrichment")
-        ssgsea_enrichments = get_enrichments_ad(filtered_genes_ad, gene_set = gene_set, verbose_log=DO_LOGGING, sample_name=slide_id)
-        ssgsea_enrichments.write(f"intermediate_data/enrichments_on_de/{slide_id}_de_gene_enrichments.h5ad")
-
+        ssgsea_enrichments = get_enrichments_ad(filtered_genes_ad, gene_set = gene_set, verbose_log=DO_LOGGING, sample_name=slide_id, suppress_warnings=SUPPRESS_WARNINGS)
+        ssgsea_enrichments.write(f"{OUT_DIR}/{slide_id}_de_gene_enrichments.h5ad")
+        if DO_LOGGING:
+            logging.debug(f"Saved to intermediate_data/{slide_id}_bc_sig_enrichments_degenes.h5ad")
     if DO_LOGGING:
-        logging.debug(f"Saved to intermediate_data/{slide_id}_bc_sig_enrichments_degenes.h5ad")
+        logging.debug(f"Run completed")
