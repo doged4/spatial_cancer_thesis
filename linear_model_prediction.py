@@ -21,17 +21,17 @@ ENRICHMENTS_DIR = "intermediate_data/enrichments_on_updn_de"
 
 MODEL_OUT_DIR = "intermediate_data/linear_models"
 # %% Get our data
-def get_data_as_dfs():
+def get_data_as_dfs(im_features_dir, enrichments_dir):
     enr_dfs = []
     im_dfs = []
     spot_info_dfs = []
 
     missed_spots = []
     # id = "S20T1"
-    biopsy_ids = [x.split("_")[0] for x in os.listdir(ENRICHMENTS_DIR)]
+    biopsy_ids = [x.split("_")[0] for x in os.listdir(enrichments_dir)]
     for id in biopsy_ids:
-        enr_ad = read_h5ad(f"{ENRICHMENTS_DIR}/{id}_de_gene_enrichments.h5ad")
-        im_ad = read_h5ad(f"{IMAGE_FEATURES_DIR}/{id}_im.h5ad")
+        enr_ad = read_h5ad(f"{enrichments_dir}/{id}_de_gene_enrichments.h5ad")
+        im_ad = read_h5ad(f"{im_features_dir}/{id}_im.h5ad")
 
         enr_df = enr_ad.to_df()
         # Only the columns we care about
@@ -62,10 +62,10 @@ def get_data_as_dfs():
 # No idea how these happened for 1390 spots
 # print(missed_spots)
 # %% Train test split
-def get_n_splits(n):
+def get_n_splits(n, X, spot_info):
     splitter = model_selection.StratifiedShuffleSplit(n_splits=n)
     return list(
-        splitter.split(im_features, spot_info.loc[:,['classification', 'biopsy_sample_id']]))
+        splitter.split(X, spot_info.loc[:,['classification', 'biopsy_sample_id']]))
 # %% Linear model with cross validation
 # base_model = sklearn.linear_model.LinearRegression()
 # base_model.fit(
@@ -100,8 +100,8 @@ if __name__ == '__main__':
     
     if DO_LOGGING:
         log = logging.getLogger('log_all')
-        sys.stdout = StreamToLogger(log, logging.INFO)
-        sys.stderr = StreamToLogger(log, logging.ERROR)
+        sys.stdout = StreamToLogger(log, logging.INFO, background=False)
+        sys.stderr = StreamToLogger(log, logging.ERROR, background=False)
 
         logging.basicConfig(filename= "model_training.log", 
                             format='%(asctime)s - %(message)s', 
@@ -109,12 +109,12 @@ if __name__ == '__main__':
         logging.debug("Starting CV Elnet run")
         
         logging.debug("Get data")
-        im_features, enrichments, spot_info = get_data_as_dfs()
+        im_features, enrichments, spot_info = get_data_as_dfs(im_features_dir=IMAGE_FEATURES_DIR, enrichments_dir=ENRICHMENTS_DIR)
         logging.debug("Data retrieved")
-        model_splits = get_n_splits(5)
+        model_splits = get_n_splits(5, im_features, spot_info)
         logging.debug("Model running")
         cv_elnet = model2(im_features, enrichments, stratify=model_splits)
         logging.debug("Model run, saving")
-        pickle.dump(cv_elnet, open(MODEL_OUT_DIR + "/proper_cv_elnet.pkl", "w"))
+        pickle.dump(cv_elnet, open(MODEL_OUT_DIR + "/proper_cv_elnet.pkl", "wb"))
 
         logging.debug(f"Run completed")
