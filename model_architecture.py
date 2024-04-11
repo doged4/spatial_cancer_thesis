@@ -12,7 +12,7 @@ from pandas import DataFrame
 
 # %% Parameters
 IMAGE_SHAPE = (380, 380, 3)
-PRETRAINED_HANDLE = "https://tfhub.dev/tensorflow/efficientnet/b4/feature-vector/1"
+PRETRAINED_HANDLE = "https://www.kaggle.com/models/tensorflow/efficientnet/TensorFlow2/b4-feature-vector/1"
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT AVAILABLE")
 
 INPUT_IMAGES_DIR = "intermediate_data/patched_data/" 
@@ -27,33 +27,32 @@ ENRICHMENTS_DIR = "intermediate_data/enrichments_on_updn_de"
 TEST_NAME = 'first full test'
 
 RANDOM_STATE = 12
+USE_SAVED = True
 # %% Load in enrichments
 # all_enrichments = read_h5ad(INPUT_ENRICHMENTS_PATH).to_df()
 # spot_names = list(all_enrichments.index) 
 # We assume that all spots in enrichments are what we care about
 
-# %% 
-_, enrichments, spot_info = get_data_as_dfs(im_features_dir=DUMMY_IMAGE_FEATURES_DIR, enrichments_dir=ENRICHMENTS_DIR)
-
-# splits = get_n_splits(5, enrichments, spot_info)
-# split_spots = []
-# for index_set in splits:
-spot_names = list(enrichments.index)
 # %%
+# Get enrichments and class info
+_, enrichments, spot_info = get_data_as_dfs(im_features_dir=DUMMY_IMAGE_FEATURES_DIR, enrichments_dir=ENRICHMENTS_DIR)
+spot_names = list(enrichments.index)
 # Train test split spots
-train_spots, test_spots = train_test_split(
-    spot_names, 
-    test_size = 0.3,
-    train_size = 0.7,
-    random_state = RANDOM_STATE,
-    stratify=spot_info.loc[:,["classification", "biopsy_sample_id"]]
-)
+if not USE_SAVED: 
 
-train_spot_suffixes = ["_" + x.split("_")[-1] for x in train_spots]
-test_spot_suffixes = ["_" + x.split("_")[-1] for x in test_spots]
+    train_spots, test_spots = train_test_split(
+        spot_names, 
+        test_size = 0.3,
+        train_size = 0.7,
+        random_state = RANDOM_STATE,
+        stratify=spot_info.loc[:,["classification", "biopsy_sample_id"]]
+    )
+    # Get suffixes for generation
+    train_spot_suffixes = ["_" + x.split("_")[-1] for x in train_spots]
+    test_spot_suffixes = ["_" + x.split("_")[-1] for x in test_spots]
 
-# %% 
-helper_extracter = image_extracter.image_extracter()
+if not USE_SAVED:
+    helper_extracter = image_extracter.image_extracter()
 
 def dataset_from_spot_names(spot_names, image_dir, enrichments_df, name_append = ""):
     """From list of spot names retrieve image data and enrichments as tf.Datasets
@@ -87,11 +86,11 @@ if not USE_SAVED:
     # Test set
     test_set = dataset_from_spot_names(test_spots, INPUT_IMAGES_DIR, enrichments, test_spot_suffixes)
 
-    train_set.save(f"intermediate_data/dataset_train_test/saved_train_rs_{RANDOM_STATE}")
-    test_set.save(f"intermediate_data/dataset_train_test/saved_test_rs_{RANDOM_STATE}")
+    train_set.save(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}")
+    test_set.save(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}")
 else:
-    train_set = tf.data.Dataset.load(f"intermediate_data/dataset_train_test/saved_train_rs_{RANDOM_STATE}")
-    test_set = tf.data.Dataset.load(f"intermediate_data/dataset_train_test/saved_test_rs_{RANDOM_STATE}")
+    train_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}")
+    test_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}")
 
 # %%
 # Model Setup
@@ -133,28 +132,34 @@ def run_fit():
     DataFrame(model_loss.history).to_csv(f"models/{TEST_NAME}_history.csv")
 # %% 
 # Run and log
-import logging
-import sys
+if __name__ == '__main__':
+    import logging
+    import sys
+    import os
 
-# Look here for guidance: https://stackoverflow.com/questions/14058453/making-python-loggers-output-all-messages-to-stdout-in-addition-to-log-file
+    # Look here for guidance: https://stackoverflow.com/questions/14058453/making-python-loggers-output-all-messages-to-stdout-in-addition-to-log-file
 
-file_handler = logging.FileHandler("transfer_learning.log")
-stdout_handler = logging.StreamHandler(sys.stdout)
-# Use StreamToLogger?
-logging.basicConfig(handlers=[file_handler, stdout_handler], format='%(asctime)s - %(message)s', level=logging.DEBUG)
-logging.debug("Beginning training")
-logging.debug(f"Params are:{
-    {
-        'IMAGE_SHAPE' : IMAGE_SHAPE,
-        'PRETRAINED_HANDLE' : PRETRAINED_HANDLE,
-        'INPUT_IMAGES_DIR' : INPUT_IMAGES_DIR,
-        # 'BIOPSY_ID_ADDED' : BIOPSY_ID_ADDED,
-        'ACTIVATION_FUNC' : ACTIVATION_FUNC,
-        'LEARNING_RATE' : LEARNING_RATE,
-        'EPOCHS' : EPOCHS,
-        'TEST_NAME' : TEST_NAME
-    }
-}")
-run_fit()
+    # file_handler = logging.FileHandler("transfer_learning.log")
+    # stdout_handler = logging.StreamHandler(sys.stdout)
+    # Use StreamToLogger?
+    logging.basicConfig(filename = "transfer_learning.log", format='%(asctime)s - %(message)s',
+                        level=logging.DEBUG, filemode = 'a')
+    logging.debug("Beginning training")
+    param_dict = {
+            'pid':os.getpid(),
+            'IMAGE_SHAPE' : IMAGE_SHAPE,
+            'PRETRAINED_HANDLE' : PRETRAINED_HANDLE,
+            'INPUT_IMAGES_DIR' : INPUT_IMAGES_DIR,
+            'USE_SAVED [takes precedent over other data loading]' : USE_SAVED,
+            'RANDOM_TT_SPLIT_STATE': RANDOM_STATE,
+            'ACTIVATION_FUNC' : ACTIVATION_FUNC,
+            'LEARNING_RATE' : LEARNING_RATE,
+            'EPOCHS' : EPOCHS,
+            'TEST_NAME' : TEST_NAME
+        }
+    logging.debug(f"Params are:{param_dict}")
+    run_fit()
 
-logging.debug("Traing complete")
+    logging.debug("Traing complete")
+
+# %%
