@@ -21,7 +21,7 @@ ENRICHMENTS_DIR = "intermediate_data/enrichments_on_updn_de"
 
 MODEL_OUT_DIR = "intermediate_data/linear_models"
 # %% Get our data
-def get_data_as_dfs(im_features_dir, enrichments_dir):
+def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exclude_ids = []):
     enr_dfs = []
     im_dfs = []
     spot_info_dfs = []
@@ -30,10 +30,15 @@ def get_data_as_dfs(im_features_dir, enrichments_dir):
     # id = "S20T1"
     biopsy_ids = [x.split("_")[0] for x in os.listdir(enrichments_dir)]
     for id in biopsy_ids:
+        if id in exclude_ids:
+            continue
         enr_ad = read_h5ad(f"{enrichments_dir}/{id}_de_gene_enrichments.h5ad")
         im_ad = read_h5ad(f"{im_features_dir}/{id}_im.h5ad")
 
-        enr_df = enr_ad.to_df()
+        if nonnormalized:
+            enr_df = pd.DataFrame(enr_ad.layers['nonnormalized'], index = enr_ad.obs_names, columns = enr_ad.var_names)
+        else:
+            enr_df = enr_ad.to_df()
         # Only the columns we care about
         enr_spot_info = enr_ad.obs.iloc[:,:7].copy()
 
@@ -84,7 +89,7 @@ def model2(X, y, stratify = None):
     mt_elnet_model = sklearn.linear_model.MultiTaskElasticNetCV(
         l1_ratio= [0.1, 0.5, 0.7, 0.9, 0.95, 0.99, 1],
         eps=1e-3,
-        n_alphas=100,
+        n_alphas=20,
         cv=cv,
         n_jobs=10
     )
@@ -110,6 +115,12 @@ if __name__ == '__main__':
         
         logging.debug("Get data")
         im_features, enrichments, spot_info = get_data_as_dfs(im_features_dir=IMAGE_FEATURES_DIR, enrichments_dir=ENRICHMENTS_DIR)
+        # im_features.to_csv(R"intermediate_data\temp\im_features_temp.csv")
+        # enrichments.to_csv(R"intermediate_data\temp\enrichments_temp.csv")
+        # spot_info.to_csv(R"intermediate_data\temp\spot_info_temp.csv")
+        # im_features = pd.read_csv("im_features_temp.csv")
+        # enrichments = pd.read_csv("enrichments_temp.csv")
+        # spot_info = pd.read_csv("spot_info_temp.csv")
         logging.debug("Data retrieved")
         model_splits = get_n_splits(5, im_features, spot_info)
         logging.debug("Model running")
