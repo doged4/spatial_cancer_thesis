@@ -14,6 +14,7 @@ import os
 import pandas as pd
 from anndata import read_h5ad
 import pickle
+import glob
 
 # %% Data params
 IMAGE_FEATURES_DIR = "intermediate_data/batch_extracted_image_adatas"
@@ -28,7 +29,7 @@ def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exc
 
     missed_spots = []
     # id = "S20T1"
-    biopsy_ids = [x.split("_")[0] for x in os.listdir(enrichments_dir)]
+    biopsy_ids = [x.split('\\')[-1].split("_")[0] for x in glob.glob(enrichments_dir + "/*h5ad")]
     for id in biopsy_ids:
         if id in exclude_ids:
             continue
