@@ -6,3 +6,4 @@ all_expression.h5ad
 big*
 external_data/genesets*
 tf_dataset_train_test
+ckpts
