@@ -93,6 +93,8 @@ def get_de_genes(config_df, p_filter = None, n_filter = None, split_fc = False):
                     up_de_genes = up_de_genes.iloc[:n_filter, :]
                     dn_de_genes.sort_values(by=['p_val_adj'], inplace=True)
                     dn_de_genes = dn_de_genes.iloc[:n_filter, :]
+                    # print(sum(up_de_genes.duplicated()))
+                    # print(sum(dn_de_genes.duplicated()))
                 else:
                     de_genes.sort_values(by=['p_val_adj'], inplace=True)
                     de_genes = de_genes.iloc[:n_filter, :]
@@ -194,7 +196,9 @@ BACKGROUND = False
 SUPPRESS_WARNINGS = False
 # %% Get gene counts
 # %%
-OUT_DIR = "intermediate_data/enrichments_on_updn_de"
+# OUT_DIR = "intermediate_data/enrichments_on_updn_de"
+OUT_DIR = "intermediate_data/enrichments_on_external"
+CANNONICAL_GENE_PATH = "intermediate_data/external_data/genesets.c6_breast_keyword.hsabiens.gmt"
 if __name__ == '__main__':
     
     if DO_LOGGING:
@@ -218,9 +222,13 @@ if __name__ == '__main__':
     print(config)
 
     # gene_set = get_de_genes(config, p_filter=0.01)
-    gene_set = get_de_genes(config, n_filter=100, split_fc=True)
+    # gene_set = get_de_genes(config, n_filter=100, split_fc=True)
     print("Using this gene set")
-    print(gene_set.keys())
+    if CANNONICAL_GENE_PATH != "":
+        gene_set = CANNONICAL_GENE_PATH
+        print(gene_set)
+    else:
+        print(gene_set.keys())
 
     if DO_LOGGING:
         logging.debug("Starting enrichments")
@@ -236,8 +244,10 @@ if __name__ == '__main__':
         if DO_LOGGING:
             logging.debug("Running enrichment")
         ssgsea_enrichments = get_enrichments_ad(filtered_genes_ad, gene_set = gene_set, verbose_log=DO_LOGGING, sample_name=slide_id, suppress_warnings=SUPPRESS_WARNINGS)
-        ssgsea_enrichments.write(f"{OUT_DIR}/{slide_id}_de_gene_enrichments.h5ad")
+        # ssgsea_enrichments.write(f"{OUT_DIR}/{slide_id}_de_gene_enrichments.h5ad")
+        ssgsea_enrichments.write(f"{OUT_DIR}/{slide_id}_gene_enrichments.h5ad")
         if DO_LOGGING:
-            logging.debug(f"Saved to intermediate_data/{slide_id}_bc_sig_enrichments_degenes.h5ad")
+            # logging.debug(f"Saved to intermediate_data/{slide_id}_bc_sig_enrichments_degenes.h5ad")
+            logging.debug(f"Saved to {OUT_DIR}/{slide_id}_gene_enrichments.h5ad")
     if DO_LOGGING:
         logging.debug(f"Run completed")
