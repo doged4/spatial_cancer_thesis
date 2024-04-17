@@ -14,7 +14,7 @@ class image_extracter:
         # Set default model
         if model_handle_url == None:
             # Efficientnet b4
-            self.model_handle_url = "https://tfhub.dev/tensorflow/efficientnet/b4/feature-vector/1"
+            self.model_handle_url = "https://www.kaggle.com/models/tensorflow/efficientnet/TensorFlow2/b4-feature-vector/1"
         else:
             self.model_handle_url = model_handle_url
         
@@ -86,27 +86,35 @@ class image_extracter:
         return self.model(im_tensor)
     
 
-    def image_set_from_path(self, path, in_place = True):
+    def image_set_from_path(self, path, in_place = True, name_append = ""):
         """From path to folder of images generate tensorflow image dataset"""
-        path_as_glob = path
-        if path[-1] != '*':
-            if path[-1] == '/':
-                path_as_glob += '*'
-            else:
-                path_as_glob += '/*'
-
-        self._filenames = tf.data.Dataset.list_files(path_as_glob, shuffle=False)
+        if type(path) == str:
+            path_as_glob = path
+            if path[-1] != '*':
+                if path[-1] == '/':
+                    path_as_glob += '*'
+                else:
+                    path_as_glob += '/*'
+            self._filenames = tf.data.Dataset.list_files(path_as_glob, shuffle=False)
+        elif type(path) == list:
+            self._filenames = tf.data.Dataset.list_files(path, shuffle=False)
+        
+        if type(name_append) == list:
+            assert len(name_append) == len(self._filenames)
+            dict_result =  {
+                    'images': self._filenames.map(image_extracter._read_image),
+                    'names' : [image_extracter._read_spot_name(x) + y for x,y in zip(self._filenames, name_append)]
+                }
+        else:
+            dict_result =  {
+                'images': self._filenames.map(image_extracter._read_image),
+                'names' : [image_extracter._read_spot_name(x) + name_append for x in self._filenames]
+            }
 
         if in_place:
-            self.image_set = {
-                'images': self._filenames.map(image_extracter._read_image),
-                'names' : [image_extracter._read_spot_name(x) for x in self._filenames]
-            }
+            self.image_set = dict_result
         else:
-            return {
-                'images': self._filenames.map(image_extracter._read_image),
-                'names' : [image_extracter._read_spot_name(x) for x in self._filenames]
-            }
+            return dict_result
 
     @staticmethod
     def _read_image (path):

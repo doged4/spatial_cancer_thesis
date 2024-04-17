@@ -4,3 +4,9 @@ all_expression.h5ad
 *.h5ad
 *pickle
 big*
+external_data/genesets*
+tf_dataset_train_test
+ckpts
+temp
+predicted*
+enrichments_on_updn_de

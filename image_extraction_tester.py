@@ -282,7 +282,7 @@ new_extracter.prep_model()
 
 # 
 INPUTS_DIR = "intermediate_data/patched_data/"
-OUTPUTS_DIR = "intermediate_data/batch_extracted_adatas"
+OUTPUTS_DIR = "intermediate_data/batch_extracted_image_adatas"
 logging.debug("Starting extraction loop")
 for folder in os.listdir(INPUTS_DIR):
     logging.debug(f"Starting {folder}")
