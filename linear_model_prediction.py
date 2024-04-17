@@ -22,7 +22,7 @@ ENRICHMENTS_DIR = "intermediate_data/enrichments_on_updn_de"
 
 MODEL_OUT_DIR = "intermediate_data/linear_models"
 # %% Get our data
-def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exclude_ids = []):
+def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exclude_ids = [], is_de = True):
     enr_dfs = []
     im_dfs = []
     spot_info_dfs = []
@@ -33,7 +33,10 @@ def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exc
     for id in biopsy_ids:
         if id in exclude_ids:
             continue
-        enr_ad = read_h5ad(f"{enrichments_dir}/{id}_de_gene_enrichments.h5ad")
+        if is_de:
+            enr_ad = read_h5ad(f"{enrichments_dir}/{id}_de_gene_enrichments.h5ad")
+        else:
+            enr_ad = read_h5ad(f"{enrichments_dir}/{id}_gene_enrichments.h5ad")
         im_ad = read_h5ad(f"{im_features_dir}/{id}_im.h5ad")
 
         if nonnormalized:
