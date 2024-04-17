@@ -14,3 +14,4 @@ meeting notes
 __pycache__
 intermediate_data/im_features_s8t2.csv
 *.log
+intermediate_data/temp/
