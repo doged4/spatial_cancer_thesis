@@ -7,7 +7,6 @@ from sklearn.model_selection import train_test_split
 import image_extracter
 from linear_model_prediction import get_data_as_dfs, get_n_splits
 from pandas import DataFrame
-from random import sample
 import sys
 
 # Inspired somewhat by this page: https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_tf.html
@@ -23,7 +22,7 @@ INPUT_IMAGES_DIR = "intermediate_data/patched_data/"
 DUMMY_IMAGE_FEATURES_DIR = "intermediate_data/batch_extracted_image_adatas"
 
 if len(sys.argv) == 1:
-    TEST_NAME  = 'full_test_nn_5_dropout'
+    TEST_NAME  = 'full_test_nn_8_dropout'
 else:
     TEST_NAME = sys.argv[1]
 if len(sys.argv) > 2:
@@ -53,18 +52,25 @@ _, enrichments, spot_info = get_data_as_dfs(im_features_dir=DUMMY_IMAGE_FEATURES
 # Remove biopsies that have been designated as holdouts
 for biop in HOLDOUT_BIOPSIES:
     enrichments = enrichments.filter(regex=f"^\w*-1_\d\d\D_(?!{biop})", axis=0)
+    spot_info = spot_info.filter(regex=f"^\w*-1_\d\d\D_(?!{biop})", axis=0)
 # Get spot names for dataset making
 spot_names = list(enrichments.index)
 
-# # TODO: remove small test
 
 # spot_names
 # Train test split spots
 if not USE_SAVED: 
     if NONNORMALIZED:
-        sd_nn_enrichments = enrichments.std(axis=0)
-        mean_nn_enrichments = enrichments.mean(axis=0)
-        enrichments = enrichments.sub(mean_nn_enrichments, axis=1).div(mean_nn_enrichments, axis = 1)
+        # sd_nn_enrichments = enrichments.std(axis=0)
+        # mean_nn_enrichments = enrichments.mean(axis=0)
+        # enrichments = enrichments.sub(mean_nn_enrichments, axis=1).div(sd_nn_enrichments, axis = 1)
+
+        # DIVIDE BY MEAN
+        # sd_nn_enrichments = enrichments.std(axis=0)
+        for slide in spot_info['biopsy_sample_id'].unique():
+            temp_means = enrichments.loc[spot_info['biopsy_sample_id'] == slide, :].mean(axis=0)
+            enrichments.loc[spot_info['biopsy_sample_id'] == slide, :] = enrichments.loc[
+                spot_info['biopsy_sample_id'] == slide, :].div(temp_means, axis=1)
 
     train_spots, test_spots = train_test_split(
         spot_names, 
@@ -114,20 +120,20 @@ if not USE_SAVED:
     # Test set
     test_set = dataset_from_spot_names(test_spots, INPUT_IMAGES_DIR, enrichments, test_spot_suffixes)
 
-    train_set.save(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}")
-    test_set.save(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}")
+    train_set.save(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}_hold_{'-'.join(HOLDOUT_BIOPSIES)}")
+    test_set.save(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}_hold_{'-'.join(HOLDOUT_BIOPSIES)}")
 else:
     # train_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_nnorm_{NONNORMALIZED}")
     # test_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_nnorm_{NONNORMALIZED}")
-    train_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}")
-    test_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}")
+    train_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_train_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}_hold_{'-'.join(HOLDOUT_BIOPSIES)}")
+    test_set = tf.data.Dataset.load(f"intermediate_data/tf_dataset_train_test/saved_test_rs_{RANDOM_STATE}_ttsplit_{TT_SPLIT_FRAC}_norm_{NONNORMALIZED}_hold_{'-'.join(HOLDOUT_BIOPSIES)}")
 
 # %%
 # Model Setup
 # Not actually set here
 ACTIVATION_FUNC = 'relu'
 LEARNING_RATE = 1e-4
-EPOCHS = 7
+EPOCHS = 20
 LOAD_MODEL = False
 DROPOUT = 0.5
 
@@ -161,7 +167,7 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     save_best_only=True)
 
 model_backup_callback = tf.keras.callbacks.BackupAndRestore(
-    backup_dir, save_freq="epoch", delete_checkpoint=True
+    backup_dir, save_freq="epoch", delete_checkpoint=False
 )
 
 model_history_callback = tf.keras.callbacks.CSVLogger(f"models/{TEST_NAME}_running_history.csv")

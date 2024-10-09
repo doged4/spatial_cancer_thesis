@@ -22,7 +22,7 @@ ENRICHMENTS_DIR = "intermediate_data/enrichments_on_updn_de"
 
 MODEL_OUT_DIR = "intermediate_data/linear_models"
 # %% Get our data
-def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exclude_ids = [], is_de = True):
+def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exclude_ids = [], is_de = True, scale_by_means = False):
     enr_dfs = []
     im_dfs = []
     spot_info_dfs = []
@@ -41,8 +41,15 @@ def get_data_as_dfs(im_features_dir, enrichments_dir, nonnormalized = False, exc
 
         if nonnormalized:
             enr_df = pd.DataFrame(enr_ad.layers['nonnormalized'], index = enr_ad.obs_names, columns = enr_ad.var_names)
+            if scale_by_means:
+                # print(enr_df.head())
+                enr_means = enr_df.mean(axis=0)
+                # print(enr_means)
+                enr_df = enr_df.div(enr_means, axis=1)
+                # print(enr_df.head())
         else:
             enr_df = enr_ad.to_df()
+
         # Only the columns we care about
         enr_spot_info = enr_ad.obs.iloc[:,:7].copy()
 
@@ -76,15 +83,28 @@ def get_n_splits(n, X, spot_info):
     return list(
         splitter.split(X, spot_info.loc[:,['classification', 'biopsy_sample_id']]))
 # %% Linear model with cross validation
-# base_model = sklearn.linear_model.LinearRegression()
-# base_model.fit(
-#     X = im_features,
-#     y = enrichments
-# )
-# logging.debug(f"R^2 is {base_model.score(im_features, enrichments)}")
-# print(f"R^2 is {base_model.score(im_features, enrichments)}")
+im_features, enrichments, spot_info = get_data_as_dfs(im_features_dir=IMAGE_FEATURES_DIR, 
+                                                      enrichments_dir=ENRICHMENTS_DIR, 
+                                                      nonnormalized=True,
+                                                      scale_by_means=True)
+base_model = sklearn.linear_model.LinearRegression()
+base_model.fit(
+    X = im_features,
+    y = enrichments
+)
+logging.debug(f"R^2 is {base_model.score(im_features, enrichments)}")
+print(f"R^2 is {base_model.score(im_features, enrichments)}")
+# %% plot model
+# from yellowbrick.regressor import residuals_plot
+# plotter = residuals_plot(base_model)
+# plotter.fit(    
+#     X_train = im_features,
+#     y_train = enrichments
+#     )
+# residuals_plot(base_model,X_train= im_features, y_train=enrichments, train_color=["maroon" for x in range(30)],
+#                hist='frequency')
 
-
+# %% 
 def model2(X, y, stratify = None):
     if stratify == None:
         cv = 5
